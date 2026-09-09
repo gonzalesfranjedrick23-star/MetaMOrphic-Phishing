@@ -109,6 +109,13 @@ class AgentRuntime:
         self.scan_log = ScanLog(self.log_dir)
         self.status_file = StatusFile(self.log_dir)
 
+        # SHA-256 result cache (spec parts 3 & 28): a repeated benign file (same
+        # bytes, multiple FS events, re-download) is not re-scanned. Non-safe /
+        # unknown verdicts are always re-analysed - cheap insurance.
+        self._hash_cache: "dict[str, tuple[str, float]]" = {}
+        self._hash_cache_ttl_s = 3600
+        self._hash_cache_max = 2000
+
     def start(self) -> None:
         """Create the local detection stack and begin protected monitoring."""
         with self._lock:
@@ -264,11 +271,28 @@ class AgentRuntime:
                     return
                 if self.orchestrator is None:
                     raise RuntimeError("Agent orchestrator was not initialized")
+
+                digest = self._sha256(file_path)
+                cached = self._cache_get(digest) if digest else None
+                if cached == "SAFE":
+                    self._rt("CACHE HIT", f"{digest[:12]}... previously SAFE - skipping full scan")
+                    with self._lock:
+                        self.metrics["completed"] += 1
+                    self.scan_log.record_file_scan(
+                        file_path,
+                        {"sha256": digest, "classification": "SAFE", "risk_percent": None,
+                         "analysis_status": "cached", "evidence": []},
+                        0.0, action="cache_hit",
+                    )
+                    continue
+
                 self._rt("SCAN START", file_path)
                 started = time.monotonic()
                 result = asyncio.run(self.orchestrator.analyze_file(file_path, enforce=True))
                 duration_ms = (time.monotonic() - started) * 1000.0
                 outcome = getattr(result, "outcome", None) or {}
+                if digest and outcome.get("classification"):
+                    self._cache_put(digest, str(outcome["classification"]))
                 self._rt("SCAN COMPLETE", f"{duration_ms:.0f}ms")
                 self._rt("CLASSIFICATION", str(outcome.get("classification")))
                 self._rt("ENFORCEMENT", str(outcome.get("enforcement_action"))
@@ -290,6 +314,36 @@ class AgentRuntime:
                     with self._lock:
                         self._in_progress.discard(file_path)
                 self.analysis_queue.task_done()
+
+    @staticmethod
+    def _sha256(file_path: str) -> Optional[str]:
+        import hashlib
+        try:
+            h = hashlib.sha256()
+            with open(file_path, "rb") as fh:
+                for chunk in iter(lambda: fh.read(1 << 16), b""):
+                    h.update(chunk)
+            return h.hexdigest()
+        except OSError:
+            return None
+
+    def _cache_get(self, digest: str) -> Optional[str]:
+        with self._lock:
+            hit = self._hash_cache.get(digest)
+            if not hit:
+                return None
+            verdict, ts = hit
+            if time.time() - ts > self._hash_cache_ttl_s:
+                self._hash_cache.pop(digest, None)
+                return None
+            return verdict
+
+    def _cache_put(self, digest: str, verdict: str) -> None:
+        with self._lock:
+            if len(self._hash_cache) >= self._hash_cache_max:
+                oldest = min(self._hash_cache, key=lambda k: self._hash_cache[k][1])
+                self._hash_cache.pop(oldest, None)
+            self._hash_cache[digest] = (verdict, time.time())
 
     def _record_scan(self, file_path: str, result: Any, duration_ms: float) -> None:
         """Write the structured scan-log line + refresh the status snapshot."""
