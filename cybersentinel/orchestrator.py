@@ -28,6 +28,7 @@ from cybersentinel.common import (
     ThreatDatabase,
     AnalysisOutcome,
     classification_for,
+    enforcement_for,
 )
 from cybersentinel.xai.explainer import XAIExplainer
 
@@ -263,6 +264,11 @@ class ThreatOrchestrator:
         risk_percent = float(assessment.risk_score)
         risk_01 = round(risk_percent / 100.0, 4)
         classification = classification_for(assessment.risk_level.value, analysis_type)
+        enforcement_action = enforcement_for(
+            classification, assessment.risk_level.value, analysis_type,
+            assessment.analysis_status,
+            quarantine_enabled=getattr(self, "quarantine_manager", None) is not None,
+        )
 
         contributing_ids = set(assessment.contributing_models)
         evidence = []
@@ -295,6 +301,7 @@ class ThreatOrchestrator:
             evidence=evidence,
             xai_explanation=(xai or {}).get("summary") or assessment.explanation,
             recommendation=assessment.recommendation,
+            enforcement_action=enforcement_action,
             analysis_type=analysis_type,
             target=target,
             sha256=sha256,
