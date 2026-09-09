@@ -6,7 +6,12 @@
   "homepage_url": "https://cprite.github.io/phishing-detection-ext/",
   "permissions": [
     "tabs",
-    "storage"
+    "storage",
+    "webNavigation"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "extension/background.js"
