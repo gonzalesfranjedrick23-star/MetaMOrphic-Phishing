@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberSentinel Protection Setup</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: #0b1220; color: #e5e7eb;
+      font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 560px; background: #111827;
+      border: 1px solid #1f2937; border-radius: 16px; padding: 32px 34px;
+    }
+    .brand { font-size: 13px; letter-spacing: .18em; color: #93c5fd; font-weight: 700; }
+    h1 { margin: 6px 0 6px; font-size: 24px; }
+    p.lead { color: #9ca3af; font-size: 14px; margin-bottom: 16px; }
+    ul { list-style: none; padding: 0; margin: 0 0 18px; }
+    li { display: flex; gap: 10px; padding: 8px 0; font-size: 14px; border-bottom: 1px solid #1f2937; }
+    li .why { display: block; color: #9ca3af; font-size: 12.5px; margin-top: 2px; }
+    .check { color: #34d399; font-weight: 700; }
+    label.opt { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 10px 0; }
+    .actions { display: flex; gap: 12px; margin-top: 22px; }
+    button { flex: 1; padding: 12px 16px; border-radius: 10px; border: 0; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .primary { background: #2563eb; color: #fff; }
+    .ghost { background: #1f2937; color: #e5e7eb; }
+    .note { font-size: 12px; color: #94a3b8; margin-top: 16px; line-height: 1.5; }
+    .done { display: none; text-align: center; }
+    .done h1 { color: #34d399; }
+    @media (prefers-color-scheme: light) {
+      body { background: #f1f5f9; color: #0f172a; }
+      .card { background: #fff; border-color: #e2e8f0; }
+      li { border-color: #e2e8f0; }
+      p.lead, li .why, .note { color: #475569; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card" id="setup">
+    <div class="brand">CYBERSENTINEL</div>
+    <h1>Protection Setup</h1>
+    <p class="lead">To provide real-time protection, CyberSentinel needs permission to:</p>
+    <ul>
+      <li><span class="check">&#10003;</span><span>Monitor browser navigation
+        <span class="why">Detect the page you open so it can be checked (URL only).</span></span></li>
+      <li><span class="check">&#10003;</span><span>Analyze URLs and page security characteristics
+        <span class="why">Sends the URL - and, only if the content filter is on, the page title and a short visible-text sample - to the local CyberSentinel backend. No passwords, form values, cookies or full page content.</span></span></li>
+      <li><span class="check">&#10003;</span><span>Block phishing websites
+        <span class="why">Redirect the tab to a CyberSentinel warning page when a page reaches the blocking threshold.</span></span></li>
+      <li><span class="check">&#10003;</span><span>Watch downloads for obviously-malicious files
+        <span class="why">Runs a quick URL/filename check and can cancel a clearly malicious download. The background agent performs the full on-disk scan.</span></span></li>
+      <li><span class="check">&#10003;</span><span>Show security notifications
+        <span class="why">Desktop notification when a download is blocked.</span></span></li>
+      <li><span class="check">&#10003;</span><span>Apply optional content-filtering rules
+        <span class="why">Off by default. You choose which categories to block.</span></span></li>
+    </ul>
+
+    <label class="opt"><input type="checkbox" id="dl" checked /> Enable download protection</label>
+
+    <div class="actions">
+      <button class="primary" id="enable">Enable Protection</button>
+      <button class="ghost" id="later">Not Now</button>
+    </div>
+    <p class="note">CyberSentinel runs locally. It does not disable your antivirus,
+      does not install hidden persistence, and does not collect browsing history or
+      credentials. You can turn protection off any time from the toolbar popup.</p>
+  </main>
+
+  <main class="card done" id="done">
+    <div class="brand">CYBERSENTINEL</div>
+    <h1>&#10003; Protection Enabled</h1>
+    <p class="lead">Real-time phishing protection is now active. You can close this tab.</p>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="setup.js"></script>
+</body>
+</html>

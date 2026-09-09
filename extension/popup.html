@@ -1,250 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Extension Toggle</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberSentinel</title>
   <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
-      margin: 10px;
-      text-align: center;
-      width: 260px;
+      font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      width: 320px; margin: 0; padding: 14px; background: #0b1220; color: #e5e7eb;
     }
-
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 60px;
-      height: 34px;
-    }
-
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #ccc;
-      transition: .4s;
-      border-radius: 34px;
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 26px;
-      width: 26px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-
-    input:checked + .slider {
-      background-color: #2196F3;
-    }
-
-    input:focus + .slider {
-      box-shadow: 0 0 1px #2196F3;
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(26px);
-    }
-
-    .footer {
-      margin-top: 20px;
-      font-size: 0.8em;
-      text-align: center;
-    }
-
-    .footer a {
-      color: #0000EE;
-      text-decoration: none;
-    }
-
-    .trusted {
-      margin-top: 18px;
-      text-align: left;
-      border-top: 1px solid #e0e0e0;
-      padding-top: 12px;
-    }
-
-    .trusted h2 {
-      font-size: 0.85em;
-      color: #444;
-      margin: 0 0 8px;
-      text-align: center;
-    }
-
-    #trustedEmpty {
-      font-size: 0.78em;
-      color: #999;
-      text-align: center;
-      margin: 4px 0;
-    }
-
-    #trustedList {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      max-height: 160px;
-      overflow-y: auto;
-    }
-
-    #trustedList li {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.82em;
-      padding: 4px 6px;
-      border-radius: 4px;
-    }
-
-    #trustedList li:nth-child(odd) {
-      background-color: #f5f5f5;
-    }
-
-    #trustedList .host {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      margin-right: 8px;
-    }
-
-    #trustedList .remove {
-      flex: none;
-      border: none;
-      background: none;
-      color: #e74c3c;
-      cursor: pointer;
-      font-size: 1em;
-      line-height: 1;
-      padding: 2px 4px;
-    }
-
-    #trustedList .remove:hover {
-      color: #c0392b;
-    }
-
-    .oss {
-      margin-top: 18px;
-      border-top: 1px solid #e0e0e0;
-      padding-top: 12px;
-    }
-
-    .oss h2 {
-      font-size: 0.85em;
-      color: #444;
-      margin: 0 0 8px;
-    }
-
-    .oss-btn {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      margin: 6px 0;
-      padding: 8px 10px;
-      font-size: 0.85em;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      color: #fff;
-      background-color: #e74c3c;
-    }
-
-    .oss-btn.secondary {
-      background-color: #34495e;
-    }
-
-    .oss-btn:hover {
-      filter: brightness(0.92);
-    }
-
-    #feedbackStatus {
-      font-size: 0.78em;
-      color: #2c7;
-      min-height: 1em;
-      margin: 6px 0 0;
-    }
-
-    .stats {
-      margin-top: 12px;
-      text-align: left;
-      font-size: 0.8em;
-      color: #444;
-    }
-
-    .stats h3 {
-      font-size: 0.85em;
-      color: #444;
-      margin: 0 0 6px;
-      text-align: center;
-    }
-
-    .stats .row {
-      display: flex;
-      justify-content: space-between;
-      padding: 2px 0;
-    }
-
-    .stats .row b {
-      font-weight: 600;
-      color: #222;
-    }
-
-    .stats .note {
-      font-size: 0.72em;
-      color: #999;
-      margin: 6px 0 0;
-      text-align: center;
+    .hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .hdr img { width: 30px; height: 30px; border-radius: 8px; }
+    .hdr b { font-size: 15px; color: #f8fafc; }
+    .status { display: flex; align-items: center; justify-content: space-between;
+      background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .dot.active { background: #22c55e; } .dot.degraded { background: #f59e0b; } .dot.offline { background: #ef4444; }
+    .switch { position: relative; display: inline-block; width: 42px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; background: #374151; border-radius: 24px; transition: .3s; cursor: pointer; }
+    .slider:before { content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .3s; }
+    input:checked + .slider { background: #2563eb; }
+    input:checked + .slider:before { transform: translateX(18px); }
+    .site { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+    .site .host { font-size: 13px; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .site .verdict { font-size: 20px; font-weight: 800; margin: 4px 0; }
+    .site .why { font-size: 12px; color: #9ca3af; line-height: 1.4; }
+    .row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 7px 0; }
+    section { border-top: 1px solid #1f2937; padding-top: 8px; margin-top: 8px; }
+    h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: #94a3b8; margin: 4px 0 6px; }
+    .cats { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cats label { font-size: 12px; background: #1f2937; border-radius: 6px; padding: 3px 7px; cursor: pointer; }
+    button { width: 100%; padding: 9px; border: 0; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: #2563eb; color: #fff; margin-top: 6px; }
+    button.secondary { background: #374151; color: #e5e7eb; }
+    #trustedList { list-style: none; margin: 0; padding: 0; max-height: 110px; overflow-y: auto; }
+    #trustedList li { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 4px; }
+    #trustedList .remove { border: 0; background: none; color: #f87171; cursor: pointer; width: auto; margin: 0; padding: 0 4px; }
+    #trustedEmpty, .note { font-size: 11px; color: #6b7280; }
+    #feedbackStatus { font-size: 11px; color: #34d399; min-height: 1em; }
+    .stats .row { font-size: 12px; }
+    @media (prefers-color-scheme: light) {
+      body { background: #f1f5f9; color: #0f172a; }
+      .status, .site { background: #fff; border-color: #e2e8f0; }
+      section { border-color: #e2e8f0; }
+      .cats label { background: #e2e8f0; }
     }
   </style>
 </head>
 <body>
-  <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:12px;">
-    <img src="../images/cybersentinel-logo.svg" alt="CyberSentinel logo" style="width:36px; height:36px; border-radius:10px;" />
-    <div style="font-size: 1.05em; font-weight: 700; color: #0f172a;">CyberSentinel</div>
+  <div class="hdr">
+    <img src="../images/cybersentinel-logo.svg" alt="" />
+    <b>CyberSentinel</b>
   </div>
 
-  <label class="switch">
-    <input type="checkbox" id="toggleSwitch">
-    <span class="slider"></span>
-  </label>
+  <div class="status">
+    <span><span class="dot offline" id="protDot"></span><b id="protState">Checking&hellip;</b></span>
+    <label class="switch"><input type="checkbox" id="toggleSwitch" /><span class="slider"></span></label>
+  </div>
+  <div class="note" id="protDetail" style="margin:-4px 0 10px;"></div>
 
-  <div class="trusted">
+  <div class="site">
+    <div class="host" id="siteHost">&mdash;</div>
+    <div class="verdict" id="siteVerdict">&mdash;</div>
+    <div class="why" id="siteWhy"></div>
+    <button class="secondary" id="scanBtn">Scan Again</button>
+  </div>
+
+  <section>
+    <h2>Content Filter</h2>
+    <div class="row">
+      <span>Block configured categories</span>
+      <label class="switch"><input type="checkbox" id="cfToggle" /><span class="slider"></span></label>
+    </div>
+    <div class="cats" id="cfCats"></div>
+  </section>
+
+  <section>
+    <h2>Download Protection</h2>
+    <div class="row">
+      <span>Check downloads for malicious files</span>
+      <label class="switch"><input type="checkbox" id="dlToggle" /><span class="slider"></span></label>
+    </div>
+  </section>
+
+  <section>
     <h2>Trusted sites</h2>
     <p id="trustedEmpty">No trusted sites yet.</p>
     <ul id="trustedList"></ul>
-  </div>
+  </section>
 
-  <div class="oss" id="ossSection" style="display:none">
+  <section id="ossSection" style="display:none">
     <h2>Self-learning (open-source build)</h2>
-    <button id="markPhishingBtn" class="oss-btn">Mark this site as phishing</button>
+    <button id="markPhishingBtn">Mark this site as phishing</button>
     <p id="feedbackStatus"></p>
-
-    <div class="stats" id="statsBlock">
-      <h3>Model stats</h3>
-      <div class="row"><span>Last updated:</span> <b id="statUpdated">—</b></div>
-      <div class="row"><span>Feedback points:</span> <b id="statCount">0</b></div>
-      <div class="row"><span>Accuracy:</span> <b id="statAcc">—</b></div>
-      <p class="note">On a held-out test set the model never trained on.</p>
+    <div class="stats">
+      <div class="row"><span>Feedback points</span><b id="statCount">0</b></div>
+      <div class="row"><span>Last updated</span><b id="statUpdated">&mdash;</b></div>
+      <div class="row"><span>Held-out accuracy</span><b id="statAcc">&mdash;</b></div>
     </div>
-  </div>
-
-  <div class="footer">
-    <p>Disclaimer: This extension is for educational purposes only.</p>
-    <p>Author: <a href="https://github.com/cprite" target="_blank">cprite</a></p>
-  </div>
+  </section>
 
   <script src="config.js"></script>
   <script src="popup.js"></script>
