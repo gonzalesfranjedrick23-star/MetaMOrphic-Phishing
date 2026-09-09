@@ -13,6 +13,7 @@ from flask_cors import CORS
 import asyncio
 import os
 import queue
+import re
 import threading
 from pathlib import Path
 from datetime import datetime
@@ -371,6 +372,127 @@ def scan_url():
     except Exception as e:
         logger.error(f"URL scan failed for {url}: {str(e)}")
         return jsonify({"error": f"Scan failed: {str(e)}"}), 500
+
+
+# --- content filter (separate from phishing - spec parts 15-17) ---------------
+from cybersentinel.content_filter import ContentFilterEngine, ContentPolicy  # noqa: E402
+from cybersentinel.common.result import enforcement_for  # noqa: E402
+
+CONTENT_POLICY_FILE = Path("./logs/content_policy.json")
+_content_policy = ContentPolicy.load(CONTENT_POLICY_FILE)
+
+
+@app.route('/api/v1/content/policy', methods=['GET', 'POST'])
+def content_policy():
+    """Read (GET) or update (POST) the content-filter policy."""
+    global _content_policy
+    if request.method == 'POST':
+        body = request.get_json(silent=True) or {}
+        _content_policy = ContentPolicy.from_dict({**_content_policy.to_dict(), **body})
+        try:
+            _content_policy.save(CONTENT_POLICY_FILE)
+        except OSError as exc:
+            return jsonify({"error": f"could not persist policy: {exc}"}), 500
+    from cybersentinel.content_filter import CATEGORIES
+    return jsonify({"policy": _content_policy.to_dict(), "available_categories": CATEGORIES}), 200
+
+
+@app.route('/api/v1/content/check', methods=['POST'])
+def content_check():
+    """Classify a page against the content-filter policy.
+
+    Body: {"url": "...", "page_title": "...", "page_text_sample": "..."}
+    Never labels inappropriate content as malware/phishing.
+    """
+    data = request.get_json(silent=True) or {}
+    url = data.get('url')
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    engine = ContentFilterEngine(policy=_content_policy)
+    result = engine.classify(url, data.get('page_title', ''), data.get('page_text_sample', ''))
+    result["enforcement_action"] = "REDIRECT" if result["blocked"] else "ALLOW"
+    result["url"] = url
+    result["timestamp"] = datetime.utcnow().isoformat()
+    return jsonify(result), 200
+
+
+@app.route('/api/v1/download/check', methods=['POST'])
+def download_check():
+    """Best-effort pre-download risk check from URL + filename + metadata.
+
+    The browser extension calls this on downloads.onCreated so it can cancel an
+    obviously-malicious download early. This is NOT a full file scan (the
+    extension cannot read local bytes) - the background agent performs the
+    authoritative on-disk scan once the file lands. Documented limitation.
+    """
+    data = request.get_json(silent=True) or {}
+    url = data.get('url') or data.get('finalUrl') or ''
+    filename = (data.get('filename') or '').split('\\')[-1].split('/')[-1]
+    mime = (data.get('mime') or '').lower()
+    if not url and not filename:
+        return jsonify({"error": "url or filename required"}), 400
+
+    reasons: list = []
+    risk = 0.0
+
+    # URL reputation via the phishing/url engine
+    try:
+        if url:
+            res = asyncio.run(orchestrator.analyze_url(url))
+            u = res.outcome or {}
+            if u.get("risk_percent", 0) >= 60:
+                risk = max(risk, float(u["risk_percent"]) / 100.0)
+                reasons.append(f"download source URL scored {u.get('classification')} "
+                               f"({u.get('risk_percent')}%)")
+    except Exception as exc:
+        logger.warning("download_check url analysis failed: %s", exc)
+
+    lower = filename.lower()
+    ext = ('.' + lower.rsplit('.', 1)[-1]) if '.' in lower else ''
+    dangerous_exts = {'.exe', '.scr', '.com', '.bat', '.cmd', '.js', '.jse', '.vbs',
+                      '.vbe', '.ws', '.wsf', '.ps1', '.msi', '.jar', '.hta', '.cpl',
+                      '.lnk', '.reg', '.dll', '.iso', '.img'}
+    double_ext = re.search(r"\.(pdf|docx?|xlsx?|jpe?g|png|txt|mp[34])\.(exe|scr|com|bat|cmd|js|vbs|ps1|msi|hta)$", lower)
+    if double_ext:
+        risk = max(risk, 0.8)
+        reasons.append(f"deceptive double extension: {filename}")
+    elif ext in dangerous_exts:
+        risk = max(risk, 0.45)
+        reasons.append(f"executable/script download ({ext})")
+    if mime in ('application/x-msdownload', 'application/x-dosexec', 'application/x-msdos-program'):
+        risk = max(risk, 0.45)
+        reasons.append(f"executable MIME type ({mime})")
+    if re.search(r"(keygen|crack|nulled|warez|activator|patch)", lower):
+        risk = max(risk, 0.6)
+        reasons.append("filename matches known unwanted-software pattern")
+
+    risk_percent = round(min(risk, 1.0) * 100, 1)
+    if risk_percent >= 80:
+        classification, action = "MALICIOUS", "BLOCK"
+        rec = "Do not open this file. CyberSentinel recommends cancelling the download."
+    elif risk_percent >= 55:
+        classification, action = "HIGH RISK", "BLOCK"
+        rec = "Do not open this file unless it was verified through a trusted source."
+    elif risk_percent >= 30:
+        classification, action = "SUSPICIOUS", "WARN"
+        rec = "Exercise caution and verify the source before opening or executing."
+    else:
+        classification, action = "SAFE", "ALLOW"
+        rec = ""
+
+    return jsonify({
+        "classification": classification,
+        "risk_percent": risk_percent,
+        "risk_score": round(risk_percent / 100.0, 4),
+        "enforcement_action": action,
+        "reasons": reasons or ["no pre-download risk indicators from URL/filename/metadata"],
+        "recommendation": rec,
+        "note": ("browser-level pre-check only; the background agent performs the "
+                 "authoritative on-disk scan and will quarantine if needed"),
+        "filename": filename,
+        "url": url,
+        "timestamp": datetime.utcnow().isoformat(),
+    }), 200
 
 
 @app.route('/api/v1/analysis/<analysis_id>', methods=['GET'])
