@@ -17,12 +17,15 @@ watchdog>=3.0.0        # filesystem event monitoring
 plyer>=2.1.0           # cross-platform desktop notifications
 pywin32>=306 ; sys_platform == "win32"   # Windows service + toast notifications
 
+# Malware ML pipeline (cybersentinel.malware_engine.ml) + evaluation
+scikit-learn>=1.4.0    # model comparison, calibration
+numpy>=1.26.0
+joblib>=1.3.0          # model persistence
+
 # ---------------------------------------------------------------------------
-# Training only (export_model.py) - not needed to run the platform
+# Phishing KNN training only (export_model.py) - not needed to run the platform
 # ---------------------------------------------------------------------------
 # pandas
-# numpy
-# scikit-learn
 
 # ---------------------------------------------------------------------------
 # Test tooling
