@@ -8,5 +8,9 @@ SAFE.
 """
 
 from .manager import SandboxManager, SandboxJob, SandboxStatus
+from .dynamic import DynamicBackend, NullDynamicBackend, DockerDynamicBackend
 
-__all__ = ["SandboxManager", "SandboxJob", "SandboxStatus"]
+__all__ = [
+    "SandboxManager", "SandboxJob", "SandboxStatus",
+    "DynamicBackend", "NullDynamicBackend", "DockerDynamicBackend",
+]

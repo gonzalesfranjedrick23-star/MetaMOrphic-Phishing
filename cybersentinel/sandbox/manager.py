@@ -77,12 +77,21 @@ class SandboxJob:
 class SandboxManager:
     """Run isolated static-analysis jobs on demand."""
 
-    def __init__(self, root: Optional[str] = None, timeout_s: int = DEFAULT_TIMEOUT_S):
+    def __init__(self, root: Optional[str] = None, timeout_s: int = DEFAULT_TIMEOUT_S,
+                 dynamic_backend: Optional[Any] = None):
         self.root = Path(root) if root else Path("./sandbox_jobs")
         self.root.mkdir(parents=True, exist_ok=True)
         self.timeout_s = timeout_s
         self._jobs: Dict[str, SandboxJob] = {}
         self._lock = threading.RLock()
+        if dynamic_backend is None:
+            from .dynamic import NullDynamicBackend
+            dynamic_backend = NullDynamicBackend()
+        self.dynamic_backend = dynamic_backend
+
+    def dynamic_status(self) -> Dict[str, Any]:
+        ok, reason = self.dynamic_backend.available()
+        return {"backend": self.dynamic_backend.name, "available": ok, "reason": reason}
 
     # -- public -------------------------------------------------------
     def submit(self, file_path: str, *, run_dynamic: bool = False) -> SandboxJob:
@@ -167,15 +176,14 @@ class SandboxManager:
             rp = static.get("risk_percent")
             job.risk_contribution = None if rp is None else round(float(rp) / 100.0, 4)
 
-            # DYNAMIC ANALYSIS - honestly not configured
+            # DYNAMIC ANALYSIS - only via a configured, isolated backend
             if run_dynamic:
-                job.dynamic_status = SandboxStatus.NOT_CONFIGURED.value
-                job.observations.append(
-                    "dynamic analysis requested but NOT_CONFIGURED: no isolated "
-                    "execution environment is wired in (never executed on host)"
-                )
+                self._run_dynamic(job, staged)
             else:
-                job.dynamic_status = SandboxStatus.NOT_CONFIGURED.value
+                ok, reason = self.dynamic_backend.available()
+                job.dynamic_status = (
+                    SandboxStatus.UNAVAILABLE.value if ok else SandboxStatus.NOT_CONFIGURED.value
+                )
 
             job.status = SandboxStatus.COMPLETED.value
         except Exception as exc:
@@ -184,6 +192,31 @@ class SandboxManager:
             logger.exception("Sandbox job %s failed", job.job_id)
         finally:
             self._cleanup(job)
+
+    def _run_dynamic(self, job: SandboxJob, staged: Path) -> None:
+        """Dispatch to the configured isolated dynamic backend, or report why not."""
+        ok, reason = self.dynamic_backend.available()
+        if not ok:
+            job.dynamic_status = SandboxStatus.NOT_CONFIGURED.value
+            job.observations.append(
+                f"dynamic analysis requested but NOT_CONFIGURED - backend "
+                f"'{self.dynamic_backend.name}': {reason} (sample was NOT executed on any host)"
+            )
+            return
+        try:
+            obs = self.dynamic_backend.run(str(staged), job.workspace or "", self.timeout_s)
+            job.dynamic_status = SandboxStatus.COMPLETED.value
+            job.observations.append(
+                f"dynamic analysis via '{self.dynamic_backend.name}': "
+                f"{obs.get('summary', 'completed')}"
+            )
+            if isinstance(job.static_result, dict):
+                job.static_result.setdefault("dynamic", obs)
+        except Exception as exc:
+            job.dynamic_status = SandboxStatus.FAILED.value
+            job.observations.append(
+                f"dynamic analysis backend '{self.dynamic_backend.name}' failed: {exc}"
+            )
 
     def _static_analysis(self, staged_path: str) -> Dict[str, Any]:
         """Run the central malware pipeline on the staged copy."""

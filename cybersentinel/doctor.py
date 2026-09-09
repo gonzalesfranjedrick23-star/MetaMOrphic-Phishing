@@ -275,7 +275,10 @@ def _sandbox_rows() -> List[Tuple[str, str, str]]:
         rows.append(("isolation verified", _OK if job.isolation_verified else _FAIL, ""))
         rows.append(("workspace cleanup", _OK if job.cleanup_status == "verified_removed" else _FAIL,
                      job.cleanup_status))
-        rows.append(("dynamic analysis", _OK if job.dynamic_status == "NOT_CONFIGURED" else _WARN,
+        ds = sm.dynamic_status()
+        rows.append(("dynamic backend", _OK,
+                     f"{ds['backend']} - {'available' if ds['available'] else 'NOT_CONFIGURED'}: {ds['reason']}"))
+        rows.append(("dynamic analysis", _OK if job.dynamic_status in ("NOT_CONFIGURED", "COMPLETED") else _WARN,
                      job.dynamic_status + " (never executed on host)"))
         rows.append(("static result", _OK if job.static_result else _FAIL,
                      f"{(job.static_result or {}).get('classification')}"))
