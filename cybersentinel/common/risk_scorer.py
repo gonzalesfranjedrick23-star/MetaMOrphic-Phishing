@@ -169,6 +169,7 @@ class RiskScorer:
             "malware_metamorphic": 1.2,
             "malware_pe": 1.15,
             "malware_media": 1.15,
+            "malware_ml": 1.35,
             "malware_byte": 1.0,
             "generic_analyzer": 0.8,      # metadata / format only
             "malware_behavior": 1.2,
@@ -198,7 +199,8 @@ class RiskScorer:
             if isinstance(p.evidence, dict) else ""
             for p in abstained
         }
-        if reasons <= {"not_applicable", ""}:
+        from .result import EXPECTED_ABSTENTIONS
+        if reasons <= EXPECTED_ABSTENTIONS:
             return "complete"
         return "incomplete"
     

@@ -1,11 +1,11 @@
 {
   "summary": {
-    "total": 33,
-    "implemented": 25,
-    "partial": 6,
+    "total": 34,
+    "implemented": 26,
+    "partial": 7,
     "not_configured": 1,
-    "missing": 1,
-    "verified": 32
+    "missing": 0,
+    "verified": 34
   },
   "entries": [
     {
@@ -175,14 +175,25 @@
     },
     {
       "research_feature": "Machine learning (malware)",
-      "file": "cybersentinel/malware_engine/analyzer.py",
-      "function": "GraphAnalyzer",
-      "execution_path": "no trained malware classifier (no corpus in repo)",
-      "test": "",
-      "status": "MISSING",
+      "file": "cybersentinel/malware_engine/ml/classifier.py",
+      "function": "MLAnalyzer.analyze",
+      "execution_path": "MalwareEngine -> MLAnalyzer (feature extract -> calibrated model). Pipeline implemented (train.py: CV model compare -> threshold search -> calibration -> metrics); NO trained model ships - no labelled malware corpus in repo - so the analyzer ABSTAINS until train.py is run on real data.",
+      "test": "tests/test_malware_ml.py",
+      "status": "PARTIAL",
       "symbol_present": true,
       "test_present": true,
-      "verified": false
+      "verified": true
+    },
+    {
+      "research_feature": "ML training + calibration + metrics",
+      "file": "cybersentinel/malware_engine/ml/train.py",
+      "function": "train_pipeline",
+      "execution_path": "python -m cybersentinel.malware_engine.ml.train --benign-dir --threat-dir",
+      "test": "tests/test_malware_ml.py",
+      "status": "IMPLEMENTED",
+      "symbol_present": true,
+      "test_present": true,
+      "verified": true
     },
     {
       "research_feature": "ThreatOrchestrator",

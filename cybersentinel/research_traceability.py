@@ -84,9 +84,16 @@ MAP: List[tuple] = [
      "GraphAnalyzer + MetamorphicMalwareDetector.analyze_binary",
      "tests/test_phase1_fusion.py", "IMPLEMENTED"),
     ("Machine learning (malware)",
-     "cybersentinel.malware_engine.analyzer", "GraphAnalyzer",
-     "no trained malware classifier (no corpus in repo)",
-     "", "MISSING"),
+     "cybersentinel.malware_engine.ml.classifier", "MLAnalyzer.analyze",
+     "MalwareEngine -> MLAnalyzer (feature extract -> calibrated model). Pipeline "
+     "implemented (train.py: CV model compare -> threshold search -> calibration -> "
+     "metrics); NO trained model ships - no labelled malware corpus in repo - "
+     "so the analyzer ABSTAINS until train.py is run on real data.",
+     "tests/test_malware_ml.py", "PARTIAL"),
+    ("ML training + calibration + metrics",
+     "cybersentinel.malware_engine.ml.train", "train_pipeline",
+     "python -m cybersentinel.malware_engine.ml.train --benign-dir --threat-dir",
+     "tests/test_malware_ml.py", "IMPLEMENTED"),
     ("ThreatOrchestrator",
      "cybersentinel.orchestrator", "ThreatOrchestrator.analyze_file",
      "web/api.py + agent_runtime -> orchestrator.analyze_file/analyze_url",

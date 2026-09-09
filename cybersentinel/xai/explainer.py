@@ -23,11 +23,13 @@ _ABSTENTION_PHRASES = {
     "unavailable": "analysis component unavailable",
     "unavailable_or_no_match": "analysis component unavailable",
     "not_applicable": "not applicable to this file type",
+    "not_configured": "optional component not configured",
     "analysis_failed": "analysis failed",
     "analysis_incomplete": "analysis incomplete",
     "error": "analysis error",
     "skipped": "analysis skipped",
 }
+_EXPECTED_ABSTENTION_STATUSES = {"not_applicable", "not_configured"}
 
 
 class XAIExplainer:
@@ -87,7 +89,7 @@ class XAIExplainer:
                 "reason": _ABSTENTION_PHRASES.get(status, "analysis incomplete"),
                 "detail": p.reasoning,
             }
-            (not_applicable if status == "not_applicable" else incomplete).append(row)
+            (not_applicable if status in _EXPECTED_ABSTENTION_STATUSES else incomplete).append(row)
 
         summary = self._summarize(
             assessment, top_factors, incomplete, contributing,

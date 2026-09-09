@@ -116,11 +116,17 @@ ABSTENTION_STATUSES = {
     "analysis_failed",
     "analysis_incomplete",
     "not_applicable",
+    "not_configured",           # optional component, no config - expected, not an error
     "unavailable",
     "unavailable_or_no_match",  # legacy value still emitted by older code paths
     "error",
     "skipped",
 }
+
+# Abstention reasons that are EXPECTED for a given input / setup and so do not
+# make the overall analysis "incomplete" (they are still listed, and the XAI
+# still names them).
+EXPECTED_ABSTENTIONS = {"not_applicable", "not_configured", ""}
 
 
 @dataclass

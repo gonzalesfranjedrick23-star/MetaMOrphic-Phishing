@@ -207,11 +207,16 @@ def _malware_rows() -> List[Tuple[str, str, str]]:
     try:
         _, outcome = _run_eicar_trace()
         contrib = outcome.get("contributing_models", [])
+        abst = outcome.get("abstained_models", [])
         for layer in ("generic_analyzer", "malware_yara", "malware_pe",
-                      "malware_graph", "malware_metamorphic", "malware_byte"):
-            rows.append((layer, _OK if layer in contrib else _WARN,
-                         "contributed" if layer in contrib
-                         else "abstained on EICAR text (expected for PE/graph)"))
+                      "malware_graph", "malware_metamorphic", "malware_byte",
+                      "malware_media", "malware_ml"):
+            if layer in contrib:
+                rows.append((layer, _OK, "contributed"))
+            elif layer == "malware_ml":
+                rows.append((layer, _WARN, "NOT_CONFIGURED - no trained model (train.py)"))
+            else:
+                rows.append((layer, _WARN, "abstained on EICAR text (expected for PE/graph)"))
         rows.append(("EICAR fusion", _OK if outcome.get("risk_percent", 0) > 40 else _FAIL,
                      f"{outcome.get('classification')} @ {outcome.get('risk_percent')}%"))
         rows.append(("enforcement_action", _OK if outcome.get("enforcement_action") else _FAIL,

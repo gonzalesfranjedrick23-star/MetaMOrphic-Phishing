@@ -23,11 +23,13 @@ def test_traceability_every_referenced_symbol_and_test_exists():
         assert required in features
 
 
-def test_traceability_reports_missing_honestly():
+def test_traceability_reports_ml_status_honestly():
     report = build()
     ml = next(e for e in report["entries"] if e["research_feature"] == "Machine learning (malware)")
-    assert ml["status"] == "MISSING"
-    assert ml["verified"] is False
+    # pipeline exists but no trained model / corpus -> PARTIAL, and the note says so
+    assert ml["status"] == "PARTIAL"
+    assert "no labelled malware corpus" in ml["execution_path"].lower() or \
+           "no trained model" in ml["execution_path"].lower()
 
 
 def test_scan_cache_skips_repeated_benign_bytes(tmp_path):
