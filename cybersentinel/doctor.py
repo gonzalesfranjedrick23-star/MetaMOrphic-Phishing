@@ -201,7 +201,95 @@ def _realtime_rows() -> List[Tuple[str, str, str]]:
     return rows
 
 
-def run_doctor(eicar: bool = False, realtime: bool = False,
+def _malware_rows() -> List[Tuple[str, str, str]]:
+    """Per-layer malware pipeline check (spec part 39)."""
+    rows, engine = _malware_engine_rows()
+    try:
+        _, outcome = _run_eicar_trace()
+        contrib = outcome.get("contributing_models", [])
+        for layer in ("generic_analyzer", "malware_yara", "malware_pe",
+                      "malware_graph", "malware_metamorphic", "malware_byte"):
+            rows.append((layer, _OK if layer in contrib else _WARN,
+                         "contributed" if layer in contrib
+                         else "abstained on EICAR text (expected for PE/graph)"))
+        rows.append(("EICAR fusion", _OK if outcome.get("risk_percent", 0) > 40 else _FAIL,
+                     f"{outcome.get('classification')} @ {outcome.get('risk_percent')}%"))
+        rows.append(("enforcement_action", _OK if outcome.get("enforcement_action") else _FAIL,
+                     str(outcome.get("enforcement_action"))))
+    except Exception as exc:
+        rows.append(("EICAR trace", _FAIL, str(exc)))
+    return rows
+
+
+def _quarantine_rows() -> List[Tuple[str, str, str]]:
+    rows: List[Tuple[str, str, str]] = []
+    try:
+        import tempfile
+        from cybersentinel.common.database import ThreatDatabase
+        from cybersentinel.quarantine.manager import QuarantineManager
+
+        d = Path(tempfile.mkdtemp(prefix="cs_doctor_q_"))
+        db = ThreatDatabase(db_path=str(d / "db"))
+        qm = QuarantineManager(quarantine_root=str(d / "q"), db=db)
+        victim = d / "src" / "x.exe"
+        victim.parent.mkdir(parents=True)
+        victim.write_bytes(b"MZ" + b"\x90" * 200)
+        rec = qm.quarantine_file(str(victim), "malware", 95.0, "doctor")
+        rows.append(("quarantine_file", _OK, "moved + metadata stored"))
+        rows.append(("cross-process record",
+                     _OK if any(r["quarantine_id"] == rec["quarantine_id"]
+                                for r in QuarantineManager(quarantine_root=str(d / "q"),
+                                                           db=ThreatDatabase(db_path=str(d / "db"))).list_quarantine())
+                     else _FAIL, "reloaded from JSONL"))
+        try:
+            qm.delete_file(rec["quarantine_id"], confirm=False)
+            rows.append(("delete needs confirm", _FAIL, "deleted without confirm!"))
+        except ValueError:
+            rows.append(("delete needs confirm", _OK, "rejected confirm=False"))
+        res = qm.delete_file(rec["quarantine_id"], confirm=True)
+        rows.append(("delete_file", _OK if res.get("deleted") else _FAIL,
+                     "payload + record removed" if res.get("deleted") else str(res.get("error"))))
+        shutil_rmtree_quiet(d)
+    except Exception as exc:
+        rows.append(("Quarantine", _FAIL, str(exc)))
+    return rows
+
+
+def _sandbox_rows() -> List[Tuple[str, str, str]]:
+    rows: List[Tuple[str, str, str]] = []
+    try:
+        import tempfile
+        from cybersentinel.sandbox import SandboxManager, SandboxStatus
+
+        d = Path(tempfile.mkdtemp(prefix="cs_doctor_sb_"))
+        sample = d / "s.bin"
+        sample.write_bytes(EICAR)
+        sm = SandboxManager(root=str(d / "jobs"))
+        job = sm.submit(str(sample), run_dynamic=True)
+        rows.append(("job lifecycle", _OK if job.status == SandboxStatus.COMPLETED.value else _FAIL, job.status))
+        rows.append(("isolation verified", _OK if job.isolation_verified else _FAIL, ""))
+        rows.append(("workspace cleanup", _OK if job.cleanup_status == "verified_removed" else _FAIL,
+                     job.cleanup_status))
+        rows.append(("dynamic analysis", _OK if job.dynamic_status == "NOT_CONFIGURED" else _WARN,
+                     job.dynamic_status + " (never executed on host)"))
+        rows.append(("static result", _OK if job.static_result else _FAIL,
+                     f"{(job.static_result or {}).get('classification')}"))
+        shutil_rmtree_quiet(d)
+    except Exception as exc:
+        rows.append(("Sandbox", _FAIL, str(exc)))
+    return rows
+
+
+def shutil_rmtree_quiet(path: Path) -> None:
+    import shutil
+    try:
+        shutil.rmtree(path, ignore_errors=True)
+    except Exception:
+        pass
+
+
+def run_doctor(eicar: bool = False, realtime: bool = False, malware: bool = False,
+               quarantine: bool = False, sandbox: bool = False,
                file_path: str | None = None, url: str | None = None,
                **_ignored: Any) -> Dict[str, Any]:
     logging.basicConfig(level=logging.WARNING,
@@ -218,6 +306,21 @@ def run_doctor(eicar: bool = False, realtime: bool = False,
         _print_table("CyberSentinel Real-Time Protection", rows)
         report["realtime"] = {n: s for n, s, _ in rows}
         report["ok"] = all(s != _FAIL for _, s, _ in rows)
+
+    if malware:
+        rows = _malware_rows()
+        _print_table("CyberSentinel Malware Pipeline", rows)
+        report["malware"] = {n: s for n, s, _ in rows}
+
+    if quarantine:
+        rows = _quarantine_rows()
+        _print_table("CyberSentinel Quarantine", rows)
+        report["quarantine"] = {n: s for n, s, _ in rows}
+
+    if sandbox:
+        rows = _sandbox_rows()
+        _print_table("CyberSentinel Sandbox", rows)
+        report["sandbox"] = {n: s for n, s, _ in rows}
 
     if eicar or file_path or url:
         target = url if url else (file_path or "<eicar>")
@@ -237,7 +340,7 @@ def run_doctor(eicar: bool = False, realtime: bool = False,
         print(f"  xai              {outcome.get('xai_explanation', '')[:300]}")
         report["trace"] = outcome
 
-    if not realtime and not (eicar or file_path or url):
+    if not any((realtime, malware, quarantine, sandbox, eicar, file_path, url)):
         me_rows, _ = _malware_engine_rows()
         _print_table("CyberSentinel Core Engine", me_rows)
         report["engine"] = {n: s for n, s, _ in me_rows}

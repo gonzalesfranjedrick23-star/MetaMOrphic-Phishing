@@ -20,8 +20,10 @@ def main(argv: list[str] | None = None) -> int:
 
     doc = sub.add_parser("doctor", help="Detection-engine health check")
     doc.add_argument("--realtime", action="store_true", help="Check the real-time protection surface")
+    doc.add_argument("--malware", action="store_true", help="Check the malware detection pipeline")
+    doc.add_argument("--quarantine", action="store_true", help="Check the quarantine lifecycle")
+    doc.add_argument("--sandbox", action="store_true", help="Check the sandbox job lifecycle")
     doc.add_argument("--eicar", action="store_true", help="Trace an EICAR scan end to end")
-    doc.add_argument("--malware", action="store_true", help="(compat) core malware engine check")
     doc.add_argument("--file", dest="file_path", help="Trace a real file through the engine")
     doc.add_argument("--url", dest="url", help="Trace a URL through the phishing engine")
 
@@ -33,7 +35,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "doctor":
         from cybersentinel.doctor import run_doctor
-        run_doctor(eicar=args.eicar, realtime=args.realtime or args.malware,
+        run_doctor(eicar=args.eicar, realtime=args.realtime, malware=args.malware,
+                   quarantine=args.quarantine, sandbox=args.sandbox,
                    file_path=args.file_path, url=args.url)
         return 0
 
