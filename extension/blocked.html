@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CyberSentinel - Website Blocked</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh;
+      font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      background: #0b1220; color: #e5e7eb;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 620px;
+      background: #111827; border: 1px solid #1f2937; border-radius: 16px;
+      padding: 32px 34px; box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    }
+    .brand { font-size: 13px; letter-spacing: .18em; color: #93c5fd; font-weight: 700; }
+    h1 { margin: 8px 0 4px; font-size: 26px; color: #fca5a5; }
+    h1.content { color: #fdba74; }
+    .sub { color: #9ca3af; font-size: 14px; margin-bottom: 18px; word-break: break-all; }
+    .meter { display: flex; gap: 18px; align-items: baseline; margin: 14px 0 6px; }
+    .score { font-size: 40px; font-weight: 800; }
+    .level { font-size: 14px; text-transform: lowercase; color: #cbd5e1; }
+    .bar { height: 8px; border-radius: 6px; background: #1f2937; overflow: hidden; margin: 6px 0 20px; }
+    .bar > i { display: block; height: 100%; background: linear-gradient(90deg,#f59e0b,#ef4444); }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: #9ca3af; margin: 18px 0 8px; }
+    ul { margin: 0; padding-left: 18px; }
+    li { margin: 4px 0; font-size: 14px; color: #e5e7eb; }
+    .rec { background: #0f172a; border: 1px solid #1e293b; border-radius: 10px; padding: 12px 14px; font-size: 14px; margin-top: 12px; }
+    .xai { font-size: 13px; color: #cbd5e1; margin-top: 8px; line-height: 1.5; }
+    .status { font-size: 12px; color: #94a3b8; margin-top: 14px; }
+    .actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+    button {
+      flex: 1 1 160px; padding: 12px 16px; border-radius: 10px; border: 0;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .primary { background: #2563eb; color: #fff; }
+    .ghost { background: #1f2937; color: #e5e7eb; }
+    .danger { background: transparent; color: #f87171; border: 1px solid #7f1d1d; flex-basis: 100%; }
+    @media (prefers-color-scheme: light) {
+      body { background: #f1f5f9; color: #0f172a; }
+      .card { background: #fff; border-color: #e2e8f0; }
+      .rec, .bar { background: #f8fafc; }
+      .level, .xai { color: #475569; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">CYBERSENTINEL</div>
+    <h1 id="title">Website Blocked</h1>
+    <div class="sub" id="site"></div>
+
+    <div class="meter">
+      <span class="score" id="score">--%</span>
+      <span class="level" id="level"></span>
+    </div>
+    <div class="bar"><i id="barFill" style="width:0%"></i></div>
+
+    <div class="xai" id="xai"></div>
+
+    <h2>Why this is considered a risk</h2>
+    <ul id="evidence"><li>Loading analysis&hellip;</li></ul>
+
+    <div class="rec" id="rec"></div>
+    <div class="status" id="status"></div>
+
+    <div class="actions">
+      <button class="primary" id="google">Go to Google</button>
+      <button class="ghost" id="back">Go Back</button>
+      <button class="danger" id="proceed" hidden>Proceed anyway (I trust this site)</button>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="blocked.js"></script>
+</body>
+</html>

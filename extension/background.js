@@ -309,7 +309,7 @@ function notify(title, message) {
   try {
     chrome.notifications.create({
       type: "basic",
-      iconUrl: chrome.runtime.getURL("images/icon128.png"),
+      iconUrl: chrome.runtime.getURL("images/logo.png"),
       title, message, priority: 2,
     });
   } catch (e) { console.warn("notification failed", e); }
