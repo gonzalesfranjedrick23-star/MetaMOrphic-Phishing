@@ -16,8 +16,12 @@ import queue
 import re
 import threading
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
+
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 from cybersentinel.common.event_bus import EventBus
 from cybersentinel.orchestrator import ThreatOrchestrator
@@ -278,7 +282,7 @@ def health_check():
     """Health check endpoint."""
     return jsonify({
         "status": "ok",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": _utcnow_iso(),
         "version": "1.0.0",
         "phase": "Phase 4 - Full Platform"
     })
@@ -302,7 +306,7 @@ def upload_file():
         return jsonify({"error": f"File too large (max {MAX_FILE_SIZE / 1024 / 1024:.0f} MB)"}), 413
     
     # Save uploaded file temporarily
-    temp_path = UPLOAD_FOLDER / f"{datetime.utcnow().timestamp()}_{file.filename}"
+    temp_path = UPLOAD_FOLDER / f"{datetime.now(timezone.utc).timestamp()}_{file.filename}"
     file.save(str(temp_path))
     
     # Analyze asynchronously
@@ -313,7 +317,7 @@ def upload_file():
         active_analyses[analysis_id] = {
             "filename": file.filename,
             "result": result,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": _utcnow_iso(),
             "path": str(temp_path)
         }
         
@@ -326,7 +330,7 @@ def upload_file():
             "risk_score": result.risk_assessment.risk_score,
             "recommendation": result.risk_assessment.recommendation,
             "analysis_time_ms": result.analysis_time_ms,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": _utcnow_iso(),
         })
         return jsonify(payload), 200
 
@@ -365,7 +369,7 @@ def scan_url():
                 }
                 for pred in result.risk_assessment.individual_predictions
             ],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": _utcnow_iso(),
         })
         return jsonify(payload), 200
 
@@ -412,7 +416,7 @@ def content_check():
     result = engine.classify(url, data.get('page_title', ''), data.get('page_text_sample', ''))
     result["enforcement_action"] = "REDIRECT" if result["blocked"] else "ALLOW"
     result["url"] = url
-    result["timestamp"] = datetime.utcnow().isoformat()
+    result["timestamp"] = _utcnow_iso()
     return jsonify(result), 200
 
 
@@ -491,7 +495,7 @@ def download_check():
                  "authoritative on-disk scan and will quarantine if needed"),
         "filename": filename,
         "url": url,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": _utcnow_iso(),
     }), 200
 
 
@@ -607,7 +611,7 @@ def sandbox_submit():
             f = request.files['file']
             if not f.filename:
                 return jsonify({"error": "no file"}), 400
-            tmp_path = UPLOAD_FOLDER / f"sandbox_{datetime.utcnow().timestamp()}_{f.filename}"
+            tmp_path = UPLOAD_FOLDER / f"sandbox_{datetime.now(timezone.utc).timestamp()}_{f.filename}"
             f.save(str(tmp_path))
             target = str(tmp_path)
         else:
@@ -671,7 +675,7 @@ def enable_protection():
             "protection": enabled,
             "paths": paths,
             "queue_limit": analysis_queue.maxsize,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": _utcnow_iso(),
         }), 200
     except Exception as exc:
         logger.error("Protection enable failed: %s", exc)
@@ -688,7 +692,7 @@ def disable_protection():
         return jsonify({
             "status": "disabled",
             "protection": disabled,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": _utcnow_iso(),
         }), 200
     except Exception as exc:
         logger.error("Protection disable failed: %s", exc)
@@ -709,7 +713,7 @@ def protection_status():
         "agent": agent_snapshot,                       # None if the agent never ran
         "in_process": background_agent.get_status(),
         "source": "background_agent" if agent_snapshot else "in_process",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": _utcnow_iso(),
     }), 200
 
 
@@ -768,7 +772,7 @@ def realtime_health():
         "queue_depth": (snap or {}).get("queue_depth", in_proc.get("queue_size", 0)),
         "files_analyzed": (snap or {}).get("files_analyzed"),
         "threats_detected": (snap or {}).get("threats_detected"),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": _utcnow_iso(),
     }), 200
 
 
@@ -808,7 +812,7 @@ def start_monitoring():
             "status": "monitoring_active",
             "paths": monitor_paths or [str(p) for p in MONITORED_PATHS],
             "queue_limit": analysis_queue.maxsize,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": _utcnow_iso()
         }), 200
     
     except Exception as e:
@@ -826,7 +830,7 @@ def stop_monitoring():
         
         return jsonify({
             "status": "monitoring_stopped",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": _utcnow_iso()
         }), 200
     
     except Exception as e:
@@ -857,7 +861,7 @@ def get_statistics():
                 "queue_limit": analysis_queue.maxsize,
                 **analysis_metrics,
             },
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": _utcnow_iso()
         }), 200
     
     except Exception as e:

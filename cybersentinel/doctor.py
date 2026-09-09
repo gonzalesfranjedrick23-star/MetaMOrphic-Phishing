@@ -338,11 +338,15 @@ def run_doctor(eicar: bool = False, realtime: bool = False, malware: bool = Fals
         else:
             _, outcome = _run_eicar_trace()
         for key in ("classification", "risk_percent", "risk_level",
-                    "analysis_status", "recommendation"):
-            print(f"  {key:16} {outcome.get(key)}")
-        print(f"  contributing     {outcome.get('contributing_models')}")
-        print(f"  abstained        {outcome.get('abstained_models')}")
-        print(f"  xai              {outcome.get('xai_explanation', '')[:300]}")
+                    "analysis_status", "recommendation", "enforcement_action"):
+            print(f"  {key:18} {outcome.get(key)}")
+        print(f"  xai                {outcome.get('xai_explanation', '')[:300]}")
+        print("\n  Detector contributions:")
+        print(f"    {'DETECTOR':<22}{'STATUS':<12}{'CONTRIB':<9}{'SEV':<7}EVIDENCE")
+        for row in outcome.get("contributions", []):
+            print(f"    {str(row.get('detector')):<22}{str(row.get('status')):<12}"
+                  f"{str(row.get('contribution')):<9}{row.get('severity', 0):<7}"
+                  f"{str(row.get('evidence', ''))[:60]}")
         report["trace"] = outcome
 
     if not any((realtime, malware, quarantine, sandbox, eicar, file_path, url)):

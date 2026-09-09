@@ -181,6 +181,7 @@ class AnalysisOutcome:
             "xai_explanation": self.xai_explanation,
             "recommendation": self.recommendation,
             "enforcement_action": self.enforcement_action,
+            "contributions": contribution_report(self.evidence),
             "analysis_type": self.analysis_type,
             "target": self.target,
             "sha256": self.sha256,
@@ -213,6 +214,49 @@ def is_abstention(evidence: Any, confidence: float = 0.0, probability: float = 0
         if evidence.get("available") is False:
             return True
     return confidence <= 0.0 and probability <= 0.0
+
+
+def _severity_band(sev: float) -> str:
+    if sev >= 0.7:
+        return "HIGH"
+    if sev >= 0.35:
+        return "MEDIUM"
+    if sev > 0.0:
+        return "LOW"
+    return "NONE"
+
+
+def contribution_report(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Per-detector contribution view (spec part 15).
+
+    For each detector: its contribution band, status, and a one-line piece of
+    evidence - so a researcher can see which layers actually drove the verdict.
+    """
+    rows: List[Dict[str, Any]] = []
+    for item in evidence or []:
+        if not isinstance(item, dict):
+            continue
+        data = item.get("data") if isinstance(item.get("data"), dict) else {}
+        sev = float(item.get("severity", 0.0) or 0.0)
+        signal = ""
+        for key in ("matched_rules", "indicators", "suspicious_indicators",
+                    "suspicious_imports", "threats", "matched"):
+            v = data.get(key)
+            if v:
+                signal = str(v[0] if isinstance(v, list) and v else v)[:120]
+                break
+        rows.append({
+            "detector": item.get("detector"),
+            "status": item.get("status", "?"),          # contributed | abstained
+            "reason": item.get("reason", ""),
+            "contribution": _severity_band(sev) if item.get("status") == "contributed" else "-",
+            "severity": round(sev, 3),
+            "weight": item.get("weight", 1.0),
+            "evidence": signal or item.get("summary", "")[:120],
+        })
+    # contributing detectors first, by descending severity
+    rows.sort(key=lambda r: (r["status"] != "contributed", -r["severity"]))
+    return rows
 
 
 def classification_for(risk_level: str, analysis_type: str) -> str:

@@ -32,6 +32,7 @@ from .result import (
     is_abstention,
     classification_for,
     enforcement_for,
+    contribution_report,
 )
 
 __all__ = [
@@ -44,6 +45,7 @@ __all__ = [
     "is_abstention",
     "classification_for",
     "enforcement_for",
+    "contribution_report",
     # Event bus
     "EventBus",
     "Event",

@@ -10,11 +10,16 @@ Stores:
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
 import json
 import hashlib
 from pathlib import Path
+
+
+def _utcnow() -> datetime:
+    """Timezone-aware UTC now (replaces the deprecated datetime.utcnow())."""
+    return datetime.now(timezone.utc)
 
 
 @dataclass
@@ -151,7 +156,7 @@ class ThreatDatabase:
             "threat_record_id": threat_record_id,
             "feedback": feedback,
             "user_notes": user_notes,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": _utcnow().isoformat(),
         }
         self._feedback.append(feedback_record)
         self._save_feedback()

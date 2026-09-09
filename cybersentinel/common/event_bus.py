@@ -7,8 +7,12 @@ Handles routing of file/URL events through the detection pipeline.
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import Any, Callable, List, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class EventType(Enum):
@@ -48,7 +52,7 @@ class Event:
     """Base event class."""
     
     event_type: EventType
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=_utcnow)
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     source: str = ""  # Which component generated this event
     data: Dict[str, Any] = field(default_factory=dict)

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import stat as _stat
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional, Any
 import shutil
@@ -61,7 +61,7 @@ class QuarantineManager:
 
         threat_record = ThreatRecord(
             record_id=quarantine_id,
-            detection_time=datetime.utcnow(),
+            detection_time=datetime.now(timezone.utc),
             threat_type=threat_type,
             file_path=str(source),
             file_hash=file_hash,
