@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberSentinel - Unified Threat Detection Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo h1 {
+            font-size: 28px;
+            color: #667eea;
+        }
+
+        .shield-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.online {
+            background: #4caf50;
+        }
+
+        .status-dot.offline {
+            background: #f44336;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1200px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .upload-zone {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-zone:hover {
+            background: #f5f7ff;
+            border-color: #764ba2;
+        }
+
+        .upload-zone p {
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .upload-zone small {
+            color: #999;
+            font-size: 12px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        input[type="text"],
+        input[type="url"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus,
+        input[type="url"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .button-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .button-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .results {
+            margin-top: 20px;
+        }
+
+        .threat-card {
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            margin: 10px 0;
+            background: #fff5f5;
+            border-radius: 5px;
+        }
+
+        .threat-card.safe {
+            border-left-color: #4caf50;
+            background: #f1f8f4;
+        }
+
+        .threat-card.warning {
+            border-left-color: #ff9800;
+            background: #fff8f1;
+        }
+
+        .threat-card.critical {
+            border-left-color: #f44336;
+            background: #fff5f5;
+        }
+
+        .risk-score {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .risk-meter {
+            height: 8px;
+            background: #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .risk-meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #ff9800, #f44336);
+            border-radius: 4px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-box {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #999;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .monitoring-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .monitoring-toggle {
+            width: 50px;
+            height: 30px;
+            background: #ccc;
+            border-radius: 15px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.3s;
+        }
+
+        .monitoring-toggle.active {
+            background: #4caf50;
+        }
+
+        .monitoring-toggle-slider {
+            width: 26px;
+            height: 26px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+
+        .monitoring-toggle.active .monitoring-toggle-slider {
+            left: 22px;
+        }
+
+        .events-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .event-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        .event-item:last-child {
+            border-bottom: none;
+        }
+
+        .event-time {
+            color: #999;
+            font-size: 11px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #ddd;
+            border-radius: 3px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            animation: progress 1.5s ease-in-out infinite;
+        }
+
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 80%; }
+            100% { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <img class="shield-icon" src="/images/logo.png" alt="CyberSentinel logo">
+                <div>
+                    <h1>CyberSentinel</h1>
+                    <small>Phase 4 - Unified Threat Detection Platform</small>
+                </div>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot online" id="statusDot"></div>
+                <span id="statusText">System Online</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- File Upload Card -->
+            <div class="card">
+                <h2>🔍 File Analysis</h2>
+                <p>Upload any file for comprehensive threat analysis</p>
+                
+                <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                    <p>📁 Click to upload or drag and drop</p>
+                    <small>Max file size: 100 MB</small>
+                </div>
+                <input type="file" id="fileInput" onchange="analyzeFile(this.files[0])">
+                
+                <div id="fileResults"></div>
+            </div>
+
+            <!-- URL Scanner Card -->
+            <div class="card">
+                <h2>🌐 URL Scanner</h2>
+                <p>Check URLs for phishing and malware threats</p>
+                
+                <input type="url" id="urlInput" placeholder="Enter URL (e.g., https://example.com)" />
+                <button onclick="scanURL()">Scan URL</button>
+                
+                <div id="urlResults"></div>
+            </div>
+
+            <!-- Real-time Monitoring -->
+            <div class="card">
+                <h2>👁️ Real-time Monitoring</h2>
+                <p>Monitor file system and network activity</p>
+                
+                <div class="monitoring-status">
+                    <div>
+                        <strong>File Monitoring</strong>
+                        <small style="display: block; color: #999; margin-top: 5px;">Watched: /uploads, /downloads</small>
+                    </div>
+                    <div class="monitoring-toggle" id="monitoringToggle" onclick="toggleMonitoring()">
+                        <div class="monitoring-toggle-slider"></div>
+                    </div>
+                </div>
+
+                <div class="events-list" id="eventsList">
+                    <div class="event-item">
+                        <strong>Monitoring service starting...</strong>
+                        <div class="event-time">Now</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Card -->
+            <div class="card">
+                <h2>📊 Statistics</h2>
+                
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-box">
+                        <div class="stat-number" id="totalScans">0</div>
+                        <div class="stat-label">Total Scans</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="threatsDetected">0</div>
+                        <div class="stat-label">Threats Detected</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="filesQuarantined">0</div>
+                        <div class="stat-label">Files Quarantined</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="uptime">100%</div>
+                        <div class="stat-label">System Uptime</div>
+                    </div>
+                </div>
+
+                <button class="button-secondary" onclick="refreshStats()" style="margin-top: 20px;">Refresh Stats</button>
+            </div>
+
+        </main>
+
+        <!-- Full-width Quarantine List -->
+        <div class="card">
+            <h2>🔒 Quarantine Management</h2>
+            <button class="button-secondary" onclick="loadQuarantine()" style="width: auto; margin-bottom: 20px;">Load Quarantine List</button>
+            
+            <div id="quarantineList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            healthCheck();
+            refreshStats();
+            setInterval(refreshStats, 30000);  // Update stats every 30s
+        });
+
+        async function healthCheck() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                updateStatusIndicator(true);
+            } catch (e) {
+                updateStatusIndicator(false);
+            }
+        }
+
+        function updateStatusIndicator(online) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (online) {
+                statusDot.classList.remove('offline');
+                statusDot.classList.add('online');
+                statusText.textContent = 'System Online';
+            } else {
+                statusDot.classList.remove('online');
+                statusDot.classList.add('offline');
+                statusText.textContent = 'System Offline';
+            }
+        }
+
+        async function analyzeFile(file) {
+            if (!file) return;
+
+            const resultsDiv = document.getElementById('fileResults');
+            resultsDiv.innerHTML = '<div class="progress-bar"><div class="progress-fill"></div></div><p>Analyzing file...</p>';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`${API_BASE}/file/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Upload failed');
+
+                const result = await response.json();
+
+                const score = Math.max(0, Math.min(100, Number(result.risk_score) || 0));
+                const threatLevel = score >= 80 ? 'critical' :
+                                  score >= 40 ? 'warning' : 'safe';
+
+                resultsDiv.innerHTML = `
+                    <div class="threat-card ${threatLevel}">
+                        <strong>${result.filename}</strong>
+                        <div class="risk-meter">
+                            <div class="risk-meter-fill" style="width: ${score}%"></div>
+                        </div>
+                        <div class="risk-score">${score.toFixed(1)} / 100</div>
+                        <p><strong>Risk Level:</strong> ${result.risk_level}</p>
+                        <p><strong>Recommendation:</strong> ${result.recommendation}</p>
+                        <p><strong>Analysis Time:</strong> ${result.analysis_time_ms.toFixed(0)}ms</p>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="threat-card critical"><p>Error: ${error.message}</p></div>`;
+            }
+        }
+
+        async function scanURL() {
+            const url = document.getElementById('urlInput').value;
+            if (!url) return;
+
+            const resultsDiv = document.getElementById('urlResults');
+            resultsDiv.innerHTML = '<div class="progress-bar"><div class="progress-fill"></div></div><p>Scanning URL...</p>';
+
+            try {
+                const response = await fetch(`${API_BASE}/url/scan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                if (!response.ok) throw new Error('Scan failed');
+
+                const result = await response.json();
+
+                const score = Math.max(0, Math.min(100, Number(result.risk_score) || 0));
+                const threatLevel = score >= 80 ? 'critical' :
+                                  score >= 40 ? 'warning' : 'safe';
+
+                resultsDiv.innerHTML = `
+                    <div class="threat-card ${threatLevel}">
+                        <strong>${url}</strong>
+                        <div class="risk-meter">
+                            <div class="risk-meter-fill" style="width: ${score}%"></div>
+                        </div>
+                        <div class="risk-score">${score.toFixed(1)} / 100</div>
+                        <p><strong>Risk Level:</strong> ${result.risk_level}</p>
+                        <p><strong>Recommendation:</strong> ${result.recommendation}</p>
+                        <p><strong>Models:</strong> ${result.individual_predictions.length} predictions</p>
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="threat-card critical"><p>Error: ${error.message}</p></div>`;
+            }
+        }
+
+        async function toggleMonitoring() {
+            const toggle = document.getElementById('monitoringToggle');
+            toggle.classList.toggle('active');
+
+            try {
+                const endpoint = toggle.classList.contains('active') ? 
+                    `${API_BASE}/monitoring/start` : `${API_BASE}/monitoring/stop`;
+                
+                const response = await fetch(endpoint, { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to toggle monitoring');
+            } catch (error) {
+                alert('Error: ' + error.message);
+                toggle.classList.toggle('active');
+            }
+        }
+
+        async function refreshStats() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics`);
+                const stats = await response.json();
+
+                document.getElementById('totalScans').textContent = stats.total_events;
+                document.getElementById('threatsDetected').textContent = stats.threat_events;
+                document.getElementById('filesQuarantined').textContent = stats.quarantined_files;
+                const monitoring = stats.monitoring || {};
+                document.getElementById('eventsList').innerHTML = `
+                    <div class="event-item">
+                        <strong>${monitoring.protection_active ? 'Realtime protection active' : 'Realtime protection stopped'}</strong>
+                        <div class="event-time">Queue: ${monitoring.queue_depth || 0}/${monitoring.queue_limit || 0} | Completed: ${monitoring.completed || 0} | Dropped: ${monitoring.dropped || 0}</div>
+                    </div>`;
+            } catch (error) {
+                console.log('Stats update error:', error);
+            }
+        }
+
+        async function loadQuarantine() {
+            try {
+                const response = await fetch(`${API_BASE}/quarantine/list`);
+                const data = await response.json();
+
+                const quarantineDiv = document.getElementById('quarantineList');
+                
+                if (data.total === 0) {
+                    quarantineDiv.innerHTML = '<p style="color: #999;">No quarantined files</p>';
+                    return;
+                }
+
+                let html = `<p>${data.total} files in quarantine</p>`;
+                data.records.forEach((record, idx) => {
+                    html += `
+                        <div class="threat-card critical" style="margin: 10px 0;">
+                            <strong>${record.filename || 'Unknown'}</strong>
+                            <p><small>${record.file_hash}</small></p>
+                            <p><small>Risk: ${record.risk_score.toFixed(1)} | Time: ${record.timestamp}</small></p>
+                        </div>
+                    `;
+                });
+
+                quarantineDiv.innerHTML = html;
+            } catch (error) {
+                document.getElementById('quarantineList').innerHTML = 
+                    `<p style="color: #f44336;">Error loading quarantine: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

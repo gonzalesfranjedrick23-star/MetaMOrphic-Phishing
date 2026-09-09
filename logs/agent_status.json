@@ -1,0 +1,50 @@
+{
+  "ts": "2026-09-09T21:20:31.633867+00:00",
+  "malware_protection": "STOPPED",
+  "file_monitor": "polling",
+  "monitored_paths": [
+    "C:\\Users\\gonza\\AppData\\Local\\Temp\\cybersentinel_e2e_j05lhjx1"
+  ],
+  "files_analyzed": 2,
+  "threats_detected": 1,
+  "quarantined": 1,
+  "last_scan": {
+    "ts": "2026-09-09T21:20:31.561806+00:00",
+    "kind": "file",
+    "file": "C:\\Users\\gonza\\AppData\\Local\\Temp\\cybersentinel_e2e_j05lhjx1\\invoice.pdf",
+    "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f",
+    "format": "UNKNOWN",
+    "classification": "MALICIOUS",
+    "risk_percent": 85.8,
+    "risk_level": "critical",
+    "analysis_status": "complete",
+    "evidence_count": 6,
+    "contributing": [
+      "malware_yara",
+      "generic_analyzer",
+      "malware_byte",
+      "malware_metamorphic"
+    ],
+    "abstained": [
+      "malware_pe",
+      "malware_graph"
+    ],
+    "duration_ms": 27.5,
+    "action": "quarantine"
+  },
+  "queue_depth": 0,
+  "runtime": {
+    "running": false,
+    "paths": [
+      "C:\\Users\\gonza\\AppData\\Local\\Temp\\cybersentinel_e2e_j05lhjx1"
+    ],
+    "watcher": "polling",
+    "queue_depth": 0,
+    "queue_limit": 64,
+    "items_in_progress": 0,
+    "completed": 2,
+    "failed": 0,
+    "dropped": 0,
+    "last_successful_analysis": "2026-09-09T21:20:31.561769+00:00"
+  }
+}

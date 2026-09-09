@@ -1,0 +1,8 @@
+raw_data/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
+saved_models/*.pkl

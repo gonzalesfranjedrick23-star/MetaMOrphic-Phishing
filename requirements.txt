@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+# CyberSentinel runtime dependencies
+# ---------------------------------------------------------------------------
+# Web API + dashboard
+Flask>=2.0.0
+flask-cors>=3.0.0
+Werkzeug>=2.0.0
+
+# Malware detection engine
+yara-x>=1.0.0          # signature engine (official Rust YARA-X bindings)
+pefile>=2024.0.0       # PE header / section / import parsing
+lief>=0.14.0           # secondary binary parser
+capstone>=5.0.0        # live disassembly / opcode analysis
+
+# Real-time background protection
+watchdog>=3.0.0        # filesystem event monitoring
+plyer>=2.1.0           # cross-platform desktop notifications
+pywin32>=306 ; sys_platform == "win32"   # Windows service + toast notifications
+
+# ---------------------------------------------------------------------------
+# Training only (export_model.py) - not needed to run the platform
+# ---------------------------------------------------------------------------
+# pandas
+# numpy
+# scikit-learn
+
+# ---------------------------------------------------------------------------
+# Test tooling
+# ---------------------------------------------------------------------------
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
