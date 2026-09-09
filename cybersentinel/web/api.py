@@ -465,6 +465,68 @@ def delete_from_quarantine(quarantine_id):
     return jsonify(result), status
 
 
+# --- sandbox (isolated on-demand deep analysis) -------------------------------
+from cybersentinel.sandbox import SandboxManager  # noqa: E402
+
+sandbox_manager = SandboxManager(root=str(Path("./sandbox_jobs")))
+
+
+@app.route('/api/v1/sandbox/submit', methods=['POST'])
+def sandbox_submit():
+    """Run an isolated static-analysis job.
+
+    Body: multipart 'file', OR JSON {"quarantine_id": "..."} to analyse a
+    quarantined payload, OR JSON {"path": "..."} for a local path.
+    The host never executes the sample.
+    """
+    tmp_path = None
+    try:
+        if 'file' in request.files:
+            f = request.files['file']
+            if not f.filename:
+                return jsonify({"error": "no file"}), 400
+            tmp_path = UPLOAD_FOLDER / f"sandbox_{datetime.utcnow().timestamp()}_{f.filename}"
+            f.save(str(tmp_path))
+            target = str(tmp_path)
+        else:
+            body = request.get_json(silent=True) or {}
+            if body.get("quarantine_id"):
+                rec = quarantine_manager._find_record(body["quarantine_id"])
+                target = quarantine_manager._resolved_payload_path(rec).as_posix()
+            elif body.get("path"):
+                target = body["path"]
+            else:
+                return jsonify({"error": "provide a file, quarantine_id, or path"}), 400
+
+        run_dynamic = bool((request.get_json(silent=True) or {}).get("run_dynamic"))
+        job = sandbox_manager.submit(target, run_dynamic=run_dynamic)
+        return jsonify(job.to_dict()), 200
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        logger.error("Sandbox submit failed: %s", e)
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if tmp_path is not None:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+@app.route('/api/v1/sandbox/jobs', methods=['GET'])
+def sandbox_jobs():
+    return jsonify({"jobs": sandbox_manager.list_jobs()}), 200
+
+
+@app.route('/api/v1/sandbox/jobs/<job_id>', methods=['GET'])
+def sandbox_job(job_id):
+    job = sandbox_manager.get_job(job_id)
+    if job is None:
+        return jsonify({"error": "job not found"}), 404
+    return jsonify(job.to_dict()), 200
+
+
 @app.route('/api/v1/protection/enable', methods=['POST'])
 def enable_protection():
     """Enable the local background protection façade for the current runtime."""
