@@ -441,6 +441,30 @@ def restore_from_quarantine(quarantine_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/v1/quarantine/delete/<quarantine_id>', methods=['POST', 'DELETE'])
+def delete_from_quarantine(quarantine_id):
+    """Permanently delete a quarantined payload - requires explicit confirmation.
+
+    Body: {"confirm": true}  (or ?confirm=true). Returns the real OS error on
+    failure; never reports a fake success.
+    """
+    body = request.get_json(silent=True) or {}
+    confirm = bool(body.get("confirm")) or request.args.get("confirm") == "true"
+    if not confirm:
+        return jsonify({"error": "confirmation required", "hint": "send {\"confirm\": true}"}), 400
+    try:
+        result = quarantine_manager.delete_file(quarantine_id, confirm=True)
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error("Quarantine delete failed: %s", e)
+        return jsonify({"error": str(e)}), 500
+    status = 200 if result.get("deleted") else 500
+    return jsonify(result), status
+
+
 @app.route('/api/v1/protection/enable', methods=['POST'])
 def enable_protection():
     """Enable the local background protection façade for the current runtime."""
@@ -501,6 +525,65 @@ def protection_status():
         "agent": agent_snapshot,                       # None if the agent never ran
         "in_process": background_agent.get_status(),
         "source": "background_agent" if agent_snapshot else "in_process",
+        "timestamp": datetime.utcnow().isoformat(),
+    }), 200
+
+
+@app.route('/api/v1/realtime/health', methods=['GET'])
+def realtime_health():
+    """Health of the real-time protection surface (spec part 22).
+
+    Reports a component as 'active' only if it is genuinely usable - never
+    'active' when the malware engine or monitor is actually unavailable.
+    """
+    from cybersentinel.service.scan_log import StatusFile
+
+    logs_dir = Path(__file__).resolve().parents[2] / "logs"
+    snap = StatusFile.read(logs_dir)
+
+    # live engine check
+    try:
+        yara_ok = bool(malware_engine.yara.status.get("available"))
+        engine_ok = yara_ok and len(malware_engine.analyzers) >= 4
+        engine_state = "active" if engine_ok else "degraded"
+    except Exception as exc:
+        engine_state = "unavailable"
+        yara_ok = False
+
+    agent_running = bool(snap and snap.get("malware_protection") == "ACTIVE")
+    in_proc = background_agent.get_status()
+    monitor_active = agent_running or bool(in_proc.get("enabled"))
+    queue_active = (analysis_workers and any(w.is_alive() for w in analysis_workers)) or agent_running
+
+    try:
+        notif_ok = notifier._backend in ("plyer", "powershell")
+    except Exception:
+        notif_ok = False
+
+    components = {
+        "service": "active" if (agent_running or orchestrator.protection_active) else "stopped",
+        "file_monitor": "active" if monitor_active else "stopped",
+        "analysis_queue": "active" if queue_active else "stopped",
+        "malware_engine": engine_state,
+        "notification_system": "active" if notif_ok else "degraded",
+    }
+    if engine_state in ("unavailable", "degraded") or "stopped" in (components["service"], components["file_monitor"]):
+        protection = "PROTECTION DEGRADED"
+    elif all(v == "active" for v in components.values()):
+        protection = "PROTECTION ACTIVE"
+    else:
+        protection = "PROTECTION DEGRADED"
+    if components["service"] == "stopped" and components["file_monitor"] == "stopped":
+        protection = "PROTECTION OFFLINE"
+
+    return jsonify({
+        **components,
+        "protection": protection,
+        "yara": "available" if yara_ok else "unavailable",
+        "last_scan": (snap or {}).get("last_scan"),
+        "queue_depth": (snap or {}).get("queue_depth", in_proc.get("queue_size", 0)),
+        "files_analyzed": (snap or {}).get("files_analyzed"),
+        "threats_detected": (snap or {}).get("threats_detected"),
         "timestamp": datetime.utcnow().isoformat(),
     }), 200
 

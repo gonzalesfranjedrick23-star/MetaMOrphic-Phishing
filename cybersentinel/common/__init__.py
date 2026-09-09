@@ -27,9 +27,11 @@ from .result import (
     AnalysisOutcome,
     Classification,
     AnalysisStatus,
+    EnforcementAction,
     EvidenceItem,
     is_abstention,
     classification_for,
+    enforcement_for,
 )
 
 __all__ = [
@@ -37,9 +39,11 @@ __all__ = [
     "AnalysisOutcome",
     "Classification",
     "AnalysisStatus",
+    "EnforcementAction",
     "EvidenceItem",
     "is_abstention",
     "classification_for",
+    "enforcement_for",
     # Event bus
     "EventBus",
     "Event",

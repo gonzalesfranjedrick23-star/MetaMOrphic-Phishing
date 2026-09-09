@@ -207,41 +207,110 @@ class ThreatDatabase:
             "user_feedback": feedback_counts,
         }
     
+    def remove_quarantine(self, quarantine_id: str) -> bool:
+        """Remove a quarantine record (after the payload was restored/deleted).
+
+        Rewrites the JSONL file so a later process does not resurrect the row.
+        Returns True if a record was removed.
+        """
+        before = len(self._quarantine)
+        self._quarantine = [q for q in self._quarantine if q.quarantine_id != quarantine_id]
+        removed = len(self._quarantine) != before
+        if removed:
+            self._rewrite_quarantine()
+        return removed
+
+    def mark_threat_action(self, record_id: str, action: str) -> None:
+        """Update the action_taken field of a stored threat record."""
+        changed = False
+        for t in self._threats:
+            if t.record_id == record_id:
+                t.action_taken = action
+                changed = True
+        if changed:
+            self._rewrite_threats()
+
     def _load_from_disk(self) -> None:
-        """Load database from disk."""
+        """Reconstruct records from the JSONL files (survives process restarts)."""
         if self.threats_file.exists():
-            with open(self.threats_file, 'r') as f:
-                for line in f:
-                    if line.strip():
-                        data = json.loads(line)
-                        # Reconstruct ThreatRecord (simplified)
-                        # In production, would use proper deserialization
-        
+            for line in self.threats_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    self._threats.append(self._threat_from_dict(json.loads(line)))
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    continue
+
         if self.quarantine_file.exists():
-            with open(self.quarantine_file, 'r') as f:
-                for line in f:
-                    if line.strip():
-                        data = json.loads(line)
-        
+            for line in self.quarantine_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    self._quarantine.append(self._quarantine_from_dict(json.loads(line)))
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    continue
+
         if self.feedback_file.exists():
-            with open(self.feedback_file, 'r') as f:
-                for line in f:
-                    if line.strip():
+            for line in self.feedback_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+                if line.strip():
+                    try:
                         self._feedback.append(json.loads(line))
-    
+                    except json.JSONDecodeError:
+                        continue
+
+    @staticmethod
+    def _threat_from_dict(data: Dict[str, Any]) -> "ThreatRecord":
+        return ThreatRecord(
+            record_id=data["record_id"],
+            detection_time=datetime.fromisoformat(data["detection_time"]),
+            threat_type=data.get("threat_type", "unknown"),
+            file_path=data.get("file_path"),
+            url=data.get("url"),
+            file_hash=data.get("file_hash"),
+            risk_score=data.get("risk_score", 0.0),
+            risk_level=data.get("risk_level", "unknown"),
+            detections=data.get("detections") or {},
+            explanation=data.get("explanation", ""),
+            action_taken=data.get("action_taken", "detected"),
+            quarantine_path=data.get("quarantine_path"),
+            user_feedback=data.get("user_feedback"),
+        )
+
+    @staticmethod
+    def _quarantine_from_dict(data: Dict[str, Any]) -> "QuarantineRecord":
+        return QuarantineRecord(
+            quarantine_id=data["quarantine_id"],
+            original_path=data["original_path"],
+            quarantine_path=data["quarantine_path"],
+            detection_time=datetime.fromisoformat(data["detection_time"]),
+            file_hash=data["file_hash"],
+            file_size=data.get("file_size", 0),
+            threat_name=data.get("threat_name"),
+            risk_score=data.get("risk_score", 0.0),
+            analysis_json=data.get("analysis_json") or {},
+        )
+
     def _save_threats(self) -> None:
-        """Save threat records to disk."""
-        with open(self.threats_file, 'a') as f:
+        """Append the most recent threat record to disk."""
+        with open(self.threats_file, 'a', encoding="utf-8") as f:
             if self._threats:
-                latest = self._threats[-1]
-                f.write(json.dumps(latest.to_dict()) + '\n')
-    
+                f.write(json.dumps(self._threats[-1].to_dict()) + '\n')
+
     def _save_quarantine(self) -> None:
-        """Save quarantine records to disk."""
-        with open(self.quarantine_file, 'a') as f:
+        """Append the most recent quarantine record to disk."""
+        with open(self.quarantine_file, 'a', encoding="utf-8") as f:
             if self._quarantine:
-                latest = self._quarantine[-1]
-                f.write(json.dumps(latest.to_dict()) + '\n')
+                f.write(json.dumps(self._quarantine[-1].to_dict()) + '\n')
+
+    def _rewrite_threats(self) -> None:
+        tmp = self.threats_file.with_suffix(".jsonl.tmp")
+        tmp.write_text("".join(json.dumps(t.to_dict()) + "\n" for t in self._threats), encoding="utf-8")
+        tmp.replace(self.threats_file)
+
+    def _rewrite_quarantine(self) -> None:
+        tmp = self.quarantine_file.with_suffix(".jsonl.tmp")
+        tmp.write_text("".join(json.dumps(q.to_dict()) + "\n" for q in self._quarantine), encoding="utf-8")
+        tmp.replace(self.quarantine_file)
     
     def _save_feedback(self) -> None:
         """Save feedback records to disk."""

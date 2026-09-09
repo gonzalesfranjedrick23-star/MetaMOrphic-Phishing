@@ -50,6 +50,64 @@ class AnalysisStatus(str, Enum):
     FAILED = "failed"
 
 
+class EnforcementAction(str, Enum):
+    """What the enforcement layer should actually do with this result."""
+
+    ALLOW = "ALLOW"
+    WARN = "WARN"
+    BLOCK = "BLOCK"
+    QUARANTINE = "QUARANTINE"
+    REDIRECT = "REDIRECT"
+    ANALYSIS_INCOMPLETE = "ANALYSIS_INCOMPLETE"
+
+
+def enforcement_for(
+    classification: str,
+    risk_level: str,
+    analysis_type: str,
+    analysis_status: str = "complete",
+    *,
+    quarantine_enabled: bool = True,
+    block_high_risk: bool = True,
+) -> str:
+    """Central enforcement policy (spec parts 6 & 32).
+
+    One place decides the action so manual scan, real-time agent, and the
+    browser extension stay consistent. A failed/incomplete analysis never
+    becomes ALLOW.
+    """
+    status = (analysis_status or "complete").lower()
+    level = (risk_level or "unknown").lower()
+    cls = (classification or "UNKNOWN").upper()
+
+    if level == "unknown" or cls == "UNKNOWN":
+        return EnforcementAction.ANALYSIS_INCOMPLETE.value
+    if status in ("failed",):
+        return EnforcementAction.ANALYSIS_INCOMPLETE.value
+
+    if analysis_type == "url":
+        if cls == "PHISHING" or level in ("high", "critical"):
+            return EnforcementAction.REDIRECT.value
+        if cls == "SUSPICIOUS" or level == "medium":
+            return EnforcementAction.WARN.value
+        return EnforcementAction.ALLOW.value
+
+    if analysis_type == "content":  # content-filter result
+        return EnforcementAction.REDIRECT.value if cls in ("BLOCKED", "MALICIOUS") \
+            else EnforcementAction.ALLOW.value
+
+    # file / malware
+    if cls == "MALICIOUS" or level == "critical":
+        return EnforcementAction.QUARANTINE.value if quarantine_enabled else EnforcementAction.BLOCK.value
+    if cls == "HIGH RISK" or level == "high":
+        if quarantine_enabled:
+            return EnforcementAction.QUARANTINE.value
+        return EnforcementAction.BLOCK.value if block_high_risk else EnforcementAction.WARN.value
+    if cls == "SUSPICIOUS" or level == "medium":
+        return EnforcementAction.WARN.value
+    return EnforcementAction.ALLOW.value
+
+
 # Evidence-status vocabulary used inside every detector's `evidence` dict.
 # The risk engine reads these to decide whether a detector *contributed* a real
 # vote or *abstained* (could not analyze). Abstentions never lower the score.
@@ -93,6 +151,7 @@ class AnalysisOutcome:
     evidence: List[Dict[str, Any]] = field(default_factory=list)
     xai_explanation: str = ""
     recommendation: str = "review_by_user"
+    enforcement_action: str = EnforcementAction.WARN.value
 
     # --- non-breaking extras (present but not part of the required envelope) ---
     analysis_type: Optional[str] = None       # "file" | "url"
@@ -115,6 +174,7 @@ class AnalysisOutcome:
             "evidence": self.evidence,
             "xai_explanation": self.xai_explanation,
             "recommendation": self.recommendation,
+            "enforcement_action": self.enforcement_action,
             "analysis_type": self.analysis_type,
             "target": self.target,
             "sha256": self.sha256,

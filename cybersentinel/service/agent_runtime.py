@@ -208,33 +208,50 @@ class AgentRuntime:
                 **self.metrics,
             }
 
+    @staticmethod
+    def _rt(step: str, detail: str = "") -> None:
+        """Emit a single-line real-time diagnostic (spec part 4). Never silent."""
+        logger.info("[REALTIME] %s%s", step, f" - {detail}" if detail else "")
+
+    @staticmethod
+    def _rt_error(detail: str) -> None:
+        logger.error("[REALTIME ERROR] %s", detail)
+
     def _enqueue_file_event(self, event: Event) -> None:
         """Validate and de-duplicate stable monitor events before analysis."""
         raw_path = (event.data or {}).get("file_path")
         if not raw_path:
             return
+        self._rt("FILE EVENT RECEIVED", raw_path)
         try:
             path = Path(raw_path).resolve()
-            if not self._is_in_monitored_paths(path) or not path.is_file():
+            if not self._is_in_monitored_paths(path):
+                self._rt("SKIPPED", "outside monitored paths")
+                return
+            if not path.is_file():
+                self._rt("SKIPPED", "not a regular file (rename/delete in flight)")
                 return
             if path.stat().st_size > self.max_file_size:
-                logger.warning("Skipping oversized monitored file: %s", path)
+                self._rt("SKIPPED", f"oversized ({path.stat().st_size} bytes)")
                 return
-        except OSError:
+        except OSError as exc:
+            self._rt_error(f"stat failed for {raw_path}: {exc}")
             return
 
         key = str(path)
         with self._lock:
             if key in self._in_progress:
+                self._rt("DEDUPED", "already queued/in progress")
                 return
             self._in_progress.add(key)
         try:
             self.analysis_queue.put_nowait(key)
+            self._rt("QUEUED", f"{key} (depth={self.analysis_queue.qsize()})")
         except queue.Full:
             with self._lock:
                 self._in_progress.discard(key)
                 self.metrics["dropped"] += 1
-            logger.warning("Agent analysis queue is full; deferred file: %s", path)
+            self._rt_error(f"analysis queue full; deferred {path}")
 
     def _analysis_worker(self) -> None:
         while not self.stop_event.is_set():
@@ -247,9 +264,18 @@ class AgentRuntime:
                     return
                 if self.orchestrator is None:
                     raise RuntimeError("Agent orchestrator was not initialized")
+                self._rt("SCAN START", file_path)
                 started = time.monotonic()
                 result = asyncio.run(self.orchestrator.analyze_file(file_path, enforce=True))
                 duration_ms = (time.monotonic() - started) * 1000.0
+                outcome = getattr(result, "outcome", None) or {}
+                self._rt("SCAN COMPLETE", f"{duration_ms:.0f}ms")
+                self._rt("CLASSIFICATION", str(outcome.get("classification")))
+                self._rt("ENFORCEMENT", str(outcome.get("enforcement_action"))
+                         + (" (quarantined)" if getattr(result, "quarantine", None) else ""))
+                notif = (getattr(self.notifier, "history", []) or [])
+                self._rt("NOTIFICATION", "SENT" if notif and outcome.get("classification") in
+                         ("MALICIOUS", "HIGH RISK") else "not required")
                 with self._lock:
                     self.metrics["completed"] += 1
                     self.metrics["last_successful_analysis"] = datetime.now(timezone.utc).isoformat()
@@ -257,7 +283,8 @@ class AgentRuntime:
             except Exception as exc:
                 with self._lock:
                     self.metrics["failed"] += 1
-                logger.exception("Background analysis failed for %s: %s", file_path, exc)
+                self._rt_error(f"analysis failed for {file_path}: {exc}")
+                logger.exception("Background analysis failed for %s", file_path)
             finally:
                 if file_path is not None:
                     with self._lock:

@@ -6,3 +6,15 @@ __pycache__/
 .DS_Store
 .ipynb_checkpoints/
 saved_models/*.pkl
+
+# --- runtime artifacts (never commit; may contain test malware) ---
+logs/
+uploads/
+monitored/
+quarantine/
+cybersentinel_quarantine/
+cybersentinel_db/
+.pytest_cache/
+*.jsonl.tmp
+*.json.tmp
+*.quarantine
