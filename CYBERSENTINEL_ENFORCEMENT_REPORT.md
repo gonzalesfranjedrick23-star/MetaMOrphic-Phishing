@@ -1,7 +1,7 @@
 # CyberSentinel — Real-Time Enforcement, ML, Quarantine & Sandbox
 
 **Final debug report.** Covers the work done on top of the `Initial commit`
-(`4f727e7`): 78 files changed, ~4,500 insertions, **98 automated tests passing**.
+(`4f727e7`): ~90 files changed, ~5,500 insertions, **103 automated tests passing**.
 
 > CyberSentinel analyzes supported files and websites using the implemented
 > multi-layer detection framework and generates evidence-based risk assessments.
@@ -319,31 +319,45 @@ restore re-verifies the hash.
 
 ## 19. Remaining platform limitations
 
-1. **Malware ML has no trained model.** The full pipeline exists
+1. **The shipped malware ML model is a *demonstration* model, not validated
+   against real malware.** The full pipeline is implemented
    (`cybersentinel/malware_engine/ml/`: feature extraction → grouped/stratified
    split → RF/GB/LR/SVM/KNN comparison by ROC-AUC + latency → validation
-   threshold search → isotonic calibration → untouched-test metrics). **There is
-   no labelled malware corpus in this repository**, so `MLAnalyzer` abstains
-   (`not_configured`) and contributes nothing. Train with
-   `python -m cybersentinel.malware_engine.ml.train --benign-dir … --threat-dir …
-   [--group-by-prefix]` on authorised material. `research_traceability.json`
-   records this as `PARTIAL`.
+   threshold search → isotonic calibration → untouched-test metrics). There is
+   **no labelled malware corpus in this repository**, so
+   `python -m cybersentinel.malware_engine.ml.bootstrap` builds a corpus from
+   **EICAR + synthetic "metamorphic-like" variants of signed OS binaries**
+   (high-entropy overlay, packer section names, appended suspicious-API strings,
+   NOP sleds) — inert artifacts that only *look* suspicious to static analysis.
+   The resulting `saved_models/malware_ml.joblib` (gradient-boosting, test
+   ROC-AUC ≈ 0.99 on that synthetic set, Brier 0.054, `notepad.exe` → 0.09) is
+   a real calibrated classifier that detects packing/obfuscation/AV-test
+   characteristics — but it is **not** a real-world malware detector. Retrain
+   with `python -m cybersentinel.malware_engine.ml.train --benign-dir …
+   --threat-dir … --group-by-prefix` on authorised material.
+   `research_traceability.json` records this as `PARTIAL`; the provenance is in
+   `saved_models/malware_ml_README.md`.
 2. **Graph / disassembly is heuristic.** Capstone decodes instructions but the
    graph analyzer has no GNN model; there is no PalmTree / consensus-clustering
    integration. It contributes an instruction-flow approximation, and abstains
    (`not_applicable`) on non-PE input.
-3. **Dynamic sandbox analysis is `NOT_CONFIGURED`.** The sandbox performs
-   isolated *static* analysis only (the host never executes the sample). Dynamic
-   behavioural analysis would need a genuinely isolated VM/container backend,
-   which is not wired in — and is reported as such, never as a result.
+3. **Dynamic sandbox analysis needs an isolated backend.** The sandbox performs
+   isolated *static* analysis only (the host never executes the sample).
+   `SandboxManager(dynamic_backend=…)` is a documented plug point:
+   `NullDynamicBackend` (default → `NOT_CONFIGURED`) and a `DockerDynamicBackend`
+   skeleton that refuses to auto-run an unverified image. Wiring a hardened
+   `--network none --read-only` container image is an operator step;
+   `NOT_CONFIGURED` / `UNAVAILABLE` are never reported as a result.
 4. **Browser download interception is best-effort.** Fast downloads can finish
    before `cancel()`; those are caught by the background agent on disk. The
    extension protects only downloads initiated in that browser — not other apps.
 5. **`yara-python` is unavailable on Python 3.14**; YARA-X is used instead. Rule
    syntax is YARA-X compatible.
-6. **The extension has not been load-tested in Chrome** in this environment.
-7. **`git push` is blocked** in this environment — `main` (~13 commits ahead of
-   `origin/main`) must be pushed by the maintainer.
+6. **The extension's *logic* is tested (Node vm harness running the real
+   `background.js` against a mock `chrome.*` + mock backend — nav→interstitial,
+   download cancel, content filter, health, offline fallback: 10/10). A manual
+   `chrome://extensions` "Load unpacked" test is still recommended for the UI
+   pages themselves.**
 
 ---
 
