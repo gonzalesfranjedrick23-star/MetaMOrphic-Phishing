@@ -169,7 +169,7 @@ class RiskScorer:
             "malware_metamorphic": 1.2,
             "malware_pe": 1.15,
             "malware_media": 1.15,
-            "malware_ml": 1.35,
+            "malware_ml": 1.15,   # a trained model; bootstrap model is synthetic-data only
             "malware_byte": 1.0,
             "generic_analyzer": 0.8,      # metadata / format only
             "malware_behavior": 1.2,

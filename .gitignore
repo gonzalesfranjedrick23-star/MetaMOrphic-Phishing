@@ -15,6 +15,7 @@ quarantine/
 cybersentinel_quarantine/
 cybersentinel_db/
 .pytest_cache/
+sandbox_jobs/
 *.jsonl.tmp
 *.json.tmp
 *.quarantine

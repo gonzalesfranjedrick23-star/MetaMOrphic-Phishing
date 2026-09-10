@@ -177,7 +177,7 @@
       "research_feature": "Machine learning (malware)",
       "file": "cybersentinel/malware_engine/ml/classifier.py",
       "function": "MLAnalyzer.analyze",
-      "execution_path": "MalwareEngine -> MLAnalyzer (feature extract -> calibrated model). Pipeline implemented (train.py: CV model compare -> threshold search -> calibration -> metrics); NO trained model ships - no labelled malware corpus in repo - so the analyzer ABSTAINS until train.py is run on real data.",
+      "execution_path": "MalwareEngine -> MLAnalyzer -> saved_models/malware_ml.joblib (calibrated gradient-boosting). A DEMONSTRATION model ships, trained by ml.bootstrap on EICAR + synthetic 'metamorphic-like' variants of signed OS binaries - NOT real malware families (see saved_models/malware_ml_README.md). Retrain with ml.train on an authorised corpus.",
       "test": "tests/test_malware_ml.py",
       "status": "PARTIAL",
       "symbol_present": true,

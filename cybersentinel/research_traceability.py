@@ -85,10 +85,11 @@ MAP: List[tuple] = [
      "tests/test_phase1_fusion.py", "IMPLEMENTED"),
     ("Machine learning (malware)",
      "cybersentinel.malware_engine.ml.classifier", "MLAnalyzer.analyze",
-     "MalwareEngine -> MLAnalyzer (feature extract -> calibrated model). Pipeline "
-     "implemented (train.py: CV model compare -> threshold search -> calibration -> "
-     "metrics); NO trained model ships - no labelled malware corpus in repo - "
-     "so the analyzer ABSTAINS until train.py is run on real data.",
+     "MalwareEngine -> MLAnalyzer -> saved_models/malware_ml.joblib (calibrated "
+     "gradient-boosting). A DEMONSTRATION model ships, trained by ml.bootstrap on "
+     "EICAR + synthetic 'metamorphic-like' variants of signed OS binaries - NOT "
+     "real malware families (see saved_models/malware_ml_README.md). Retrain with "
+     "ml.train on an authorised corpus.",
      "tests/test_malware_ml.py", "PARTIAL"),
     ("ML training + calibration + metrics",
      "cybersentinel.malware_engine.ml.train", "train_pipeline",
