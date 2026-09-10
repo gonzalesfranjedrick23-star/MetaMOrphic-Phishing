@@ -95,20 +95,24 @@ class KNNPhishingAnalyzer(PhishingAnalyzer):
             return None
         
         try:
-            # Extract features from URL
             features = self._extract_features(url)
-            
-            # Scale features using stored scaler
             scaled_features = self._scale_features(features)
-            
-            # Compute k-NN prediction
             prob_phishing, confidence = self._knn_predict(scaled_features)
-            
+
+            # URL-only scans lack nb_hyperlinks (a real model feature), so the
+            # lexical KNN is a WEAK standalone signal - cap its confidence so a
+            # lone KNN vote cannot force a block. The extension supplies
+            # nb_hyperlinks from the live DOM; that path keeps full confidence.
+            url_only = features[10] == 0.0
+            if url_only:
+                confidence = min(confidence, 0.5)
+
             return ModelPrediction(
                 model_name="phishing_knn",
                 malicious_probability=prob_phishing,
                 confidence=confidence,
-                reasoning=f"KNN prediction: {prob_phishing*100:.1f}% phishing (k=3, Manhattan)",
+                reasoning=f"KNN prediction: {prob_phishing*100:.1f}% phishing "
+                          f"(k=3, Manhattan{'; URL-only, low confidence' if url_only else ''})",
                 evidence={
                     "features": {
                         self.model_data["feature_names"][i]: features[i]
@@ -116,72 +120,51 @@ class KNNPhishingAnalyzer(PhishingAnalyzer):
                     },
                     "k": self.k,
                     "metric": self.metric,
-                    "model_accuracy": 0.894,  # 89.4% test accuracy
+                    "url_only": url_only,
+                    "model_accuracy": 0.894,
                 }
             )
         except Exception as e:
             logger.error(f"KNN analysis failed: {e}")
             return None
     
-    def _extract_features(self, url: str) -> List[float]:
-        """Extract 11 phishing features from URL."""
-        features = []
-        
-        # 1. length_url
-        features.append(float(len(url)))
-        
-        # 2. length_hostname
+    # Parity-critical: these are the EXACT tokens + formulas extension/features.js
+    # uses to build the vectors the seed model was trained on. Any divergence
+    # feeds the KNN wrong distances and causes false positives on legit sites.
+    _PHISH_HINTS = (
+        "wp", "login", "includes", "admin", "content", "site", "images", "js",
+        "alibaba", "css", "myaccount", "dropbox", "themes", "plugins", "signin",
+        "view",
+    )
+
+    @staticmethod
+    def _count_sub(s: str, sub: str) -> int:
+        """Non-overlapping substring count - identical to Python str.count / JS split-len-1."""
+        return s.count(sub)
+
+    def _extract_features(self, url: str, nb_hyperlinks: float = 0.0) -> List[float]:
+        """11 features in seed_model.json feature_names order, matching features.js."""
         from urllib.parse import urlparse
-        parsed = urlparse(url)
-        hostname = parsed.hostname or ""
-        features.append(float(len(hostname)))
-        
-        # 3. nb_dots
-        features.append(float(url.count(".")))
-        
-        # 4. nb_hyphens
-        features.append(float(url.count("-")))
-        
-        # 5. nb_qm (question marks)
-        features.append(float(url.count("?")))
-        
-        # 6. nb_eq (equals signs)
-        features.append(float(url.count("=")))
-        
-        # 7. nb_slash
-        features.append(float(url.count("/")))
-        
-        # 8. nb_www
-        features.append(1.0 if "www" in url else 0.0)
-        
-        # 9. ratio_digits_url
-        digit_count = sum(1 for c in url if c.isdigit())
-        features.append(digit_count / len(url) if url else 0.0)
-        
-        # 10. phish_hints (suspicious patterns)
-        phish_hints = self._detect_phish_hints(url)
-        features.append(float(phish_hints))
-        
-        # 11. nb_hyperlinks (would need DOM, use 0 for URL-only)
-        features.append(0.0)  # Placeholder: requires HTML analysis
-        
-        return features
-    
-    def _detect_phish_hints(self, url: str) -> int:
-        """Detect suspicious patterns in URL."""
-        hints = 0
-        
-        # Common phishing patterns
-        suspicious_words = ["verify", "confirm", "account", "update", "login", "password"]
-        for word in suspicious_words:
-            if word in url.lower():
-                hints += 1
-        
-        # IP-based URLs
-        if any(c.isdigit() for c in url.split("://")[-1].split("/")[0]):
-            hints += 1
-        
-        return hints
+
+        url = url or ""
+        low = url.lower()
+        hostname = (urlparse(url).hostname or "")
+        digits = sum(c.isdigit() for c in url)
+        phish_hints = sum(self._count_sub(low, h) for h in self._PHISH_HINTS)
+
+        return [
+            float(len(url)),                                   # length_url
+            float(len(hostname)),                              # length_hostname
+            float(self._count_sub(url, ".")),                  # nb_dots
+            float(self._count_sub(url, "-")),                  # nb_hyphens
+            float(self._count_sub(url, "?")),                  # nb_qm
+            float(self._count_sub(url, "=")),                  # nb_eq
+            float(self._count_sub(url, "/")),                  # nb_slash
+            float(self._count_sub(url, "www")),                # nb_www  (COUNT, not boolean)
+            (digits / len(url)) if url else 0.0,               # ratio_digits_url
+            float(phish_hints),                                # phish_hints
+            float(nb_hyperlinks) if nb_hyperlinks else 0.0,    # nb_hyperlinks (DOM; 0 for URL-only)
+        ]
     
     def _scale_features(self, features: List[float]) -> List[float]:
         """Apply MinMaxScaler to features."""
@@ -338,62 +321,104 @@ class DomainLookalikeAnalyzer(PhishingAnalyzer):
         """
         self.legitimate_domains = legitimate_domains or self._get_default_domains()
     
+    # Brands whose names, when they appear in a NON-official domain, strongly
+    # indicate impersonation.
+    _BRANDS = ("paypal", "apple", "icloud", "microsoft", "office365", "outlook",
+               "google", "gmail", "amazon", "netflix", "facebook", "instagram",
+               "whatsapp", "chase", "wellsfargo", "bankofamerica", "citibank",
+               "coinbase", "binance", "dhl", "fedex", "ups", "usps", "irs",
+               "linkedin", "dropbox", "docusign", "steam")
+    _BRAND_TLDS = {b + ".com" for b in _BRANDS} | {
+        "paypal.com", "apple.com", "icloud.com", "microsoft.com", "live.com",
+        "office.com", "google.com", "gmail.com", "amazon.com", "netflix.com",
+        "facebook.com", "instagram.com", "chase.com", "coinbase.com",
+        "binance.com", "dhl.com", "fedex.com", "linkedin.com", "dropbox.com",
+    }
+    _RISKY_TLDS = (".tk", ".ml", ".ga", ".cf", ".gq", ".xyz", ".top", ".click",
+                   ".link", ".zip", ".review", ".country", ".kim", ".work")
+    _HOMOGLYPH_SUBS = {"0": "o", "1": "l", "3": "e", "5": "s", "rn": "m", "vv": "w"}
+
     async def analyze(self, url: str) -> Optional[ModelPrediction]:
-        """Detect domain lookalike attacks."""
+        """Detect domain lookalike / typosquat / brand-impersonation attacks."""
         try:
             from urllib.parse import urlparse
-            
-            parsed = urlparse(url)
-            hostname = parsed.hostname or ""
-            
-            # Extract base domain (without subdomains)
-            parts = hostname.split(".")
-            if len(parts) >= 2:
-                base_domain = f"{parts[-2]}.{parts[-1]}"
-            else:
-                base_domain = hostname
-            
-            # Find similarity to legitimate domains
-            lookalike_risk = self._compute_lookalike_risk(base_domain)
-            
+
+            parsed = urlparse(url if "://" in url else "http://" + url)
+            hostname = (parsed.hostname or "").lower()
+            labels = hostname.split(".")
+            reg = ".".join(labels[-2:]) if len(labels) >= 2 else hostname
+            main_label = labels[-2] if len(labels) >= 2 else hostname
+
+            risk = 0.0
+            reasons: List[str] = []
+            deterministic = False
+
+            if hostname and reg not in self._BRAND_TLDS:
+                for brand in self._BRANDS:
+                    if brand in hostname:
+                        # brand name present but this is not the brand's real domain
+                        risk = max(risk, 0.9)
+                        reasons.append(f"brand '{brand}' in non-official domain '{hostname}'")
+                        deterministic = True
+                        break
+                # digit/homoglyph substitution turns main label into a brand
+                deglyph = main_label
+                for a, b in self._HOMOGLYPH_SUBS.items():
+                    deglyph = deglyph.replace(a, b)
+                for brand in self._BRANDS:
+                    if deglyph != main_label and (brand in deglyph
+                                                  or self._edit_distance(deglyph, brand) <= 1):
+                        risk = max(risk, 0.88)
+                        reasons.append(f"typosquat of '{brand}' via character substitution ('{main_label}')")
+                        deterministic = True
+                        break
+                # 1-2 edit typosquat of a well-known main label
+                for good in ("paypal", "google", "amazon", "apple", "microsoft",
+                             "facebook", "netflix", "youtube", "wikipedia"):
+                    d = self._edit_distance(main_label, good)
+                    if 0 < d <= 1:
+                        risk = max(risk, 0.85)
+                        reasons.append(f"1-edit typosquat of '{good}' ('{main_label}')")
+                        deterministic = True
+
+            # punycode / non-ascii host
+            if hostname.startswith("xn--") or any(ord(c) > 127 for c in hostname):
+                risk = max(risk, 0.8)
+                reasons.append("internationalised / punycode domain (possible homograph)")
+                deterministic = True
+
+            # brand keyword + risky free TLD (softer signal)
+            if any(hostname.endswith(t) for t in self._RISKY_TLDS):
+                if any(k in url.lower() for k in ("login", "verify", "account",
+                                                  "secure", "update", "signin", "confirm")):
+                    risk = max(risk, 0.6)
+                    reasons.append("credential keyword on a free/abused TLD")
+
             return ModelPrediction(
                 model_name="phishing_domain_lookalike",
-                malicious_probability=lookalike_risk,
-                confidence=0.6,
-                reasoning=f"Domain lookalike analysis: {lookalike_risk*100:.0f}% similarity to phishing patterns",
+                malicious_probability=round(risk, 3),
+                confidence=0.9 if deterministic else 0.6,
+                reasoning=("Domain lookalike: " + "; ".join(reasons)) if reasons
+                          else "Domain lookalike analysis: no impersonation pattern",
                 evidence={
-                    "domain": base_domain,
-                    "typosquatting_risk": lookalike_risk > 0.3,
-                }
+                    "domain": reg,
+                    "hostname": hostname,
+                    "indicators": reasons,
+                    "deterministic": deterministic,
+                    "typosquatting_risk": risk >= 0.5,
+                    "signature_match": deterministic and risk >= 0.85,
+                },
             )
         except Exception as e:
             logger.error(f"Lookalike analysis failed: {e}")
             return None
     
-    def _compute_lookalike_risk(self, domain: str) -> float:
-        """Compute lookalike risk score (0.0-1.0)."""
-        # Common brand typosquatting patterns
-        typosquat_patterns = {
-            "amaz0n": 0.9,
-            "goog1e": 0.9,
-            "micros0ft": 0.9,
-            "paypa1": 0.9,
-            "appie": 0.8,
-            "gogle": 0.8,
-        }
-        
-        for pattern, risk in typosquat_patterns.items():
-            if self._edit_distance(domain.lower(), pattern) <= 2:
-                return risk
-        
-        return 0.0
-    
     @staticmethod
     def _edit_distance(s1: str, s2: str) -> int:
         """Compute Levenshtein distance between two strings."""
         if len(s1) < len(s2):
-            return URLFeatureAnalyzer._edit_distance(s2, s1)
-        
+            return DomainLookalikeAnalyzer._edit_distance(s2, s1)
+
         if len(s2) == 0:
             return len(s1)
         

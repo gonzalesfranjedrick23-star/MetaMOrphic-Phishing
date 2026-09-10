@@ -262,10 +262,29 @@ class ThreatOrchestrator:
     ) -> AnalysisOutcome:
         """Convert a RiskAssessment into the canonical shared result schema."""
         risk_percent = float(assessment.risk_score)
+        risk_level_value = assessment.risk_level.value
+
+        # Phishing corroboration guard (spec part 7 - do not block legit sites):
+        # the lexical KNN is a weak URL-only signal. A BLOCK-level phishing verdict
+        # needs a deterministic lookalike/homograph hit OR >= 2 phishing detectors
+        # above 0.5. A lone KNN vote is downgraded to SUSPICIOUS.
+        if analysis_type == "url" and risk_level_value in ("high", "critical"):
+            strong = [p for p in predictions if p.malicious_probability >= 0.5
+                      and p.model_name not in assessment.abstained_models]
+            deterministic = any(
+                isinstance(p.evidence, dict) and p.evidence.get("deterministic") is True
+                for p in strong
+            )
+            only_knn = strong and all(p.model_name == "phishing_knn" for p in strong)
+            if only_knn and not deterministic:
+                # lone lexical KNN, no corroboration -> not actionable on its own
+                risk_percent = min(risk_percent, 38.0)
+                risk_level_value = "low"
+
         risk_01 = round(risk_percent / 100.0, 4)
-        classification = classification_for(assessment.risk_level.value, analysis_type)
+        classification = classification_for(risk_level_value, analysis_type)
         enforcement_action = enforcement_for(
-            classification, assessment.risk_level.value, analysis_type,
+            classification, risk_level_value, analysis_type,
             assessment.analysis_status,
             quarantine_enabled=getattr(self, "quarantine_manager", None) is not None,
         )
@@ -296,7 +315,7 @@ class ThreatOrchestrator:
             classification=classification,
             risk_score=risk_01,
             risk_percent=round(risk_percent, 2),
-            risk_level=assessment.risk_level.value,
+            risk_level=risk_level_value,
             analysis_status=assessment.analysis_status,
             evidence=evidence,
             xai_explanation=(xai or {}).get("summary") or assessment.explanation,
